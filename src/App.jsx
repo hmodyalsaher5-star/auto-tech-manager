@@ -102,7 +102,7 @@ function App() {
       <main className="p-8 flex-grow container mx-auto">
         {/* ... (نفس كود البحث والقوائم القديم تماماً - لم يتغير) ... */}
         <div className="bg-gray-800 p-6 rounded-lg shadow-lg max-w-md mx-auto">
-          <h2 className="text-xl font-bold mb-4 text-blue-400">🔍 ابحث عن قطعة لسيارتك</h2>
+          <h2 className="text-xl font-bold mb-4 text-blue-400">🔍 نظام البحث عن المنتجات</h2>
           <div className="mb-4">
             <label className="block text-gray-400 mb-2">الشركة المصنعة</label>
             <select className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-blue-500"
