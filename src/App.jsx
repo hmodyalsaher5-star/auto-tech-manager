@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabase'
-import { carDatabase } from './data'
+import { carDatabase } from './data/data'
 import Header from './components/Header'
 import Footer from './components/Footer'
 import ProductCard from './components/ProductCard'
