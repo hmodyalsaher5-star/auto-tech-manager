@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabase'
+import { carDatabase } from './data'
 import Header from './components/Header'
 import Footer from './components/Footer'
 import ProductCard from './components/ProductCard'
@@ -19,9 +20,13 @@ function App() {
 
   useEffect(() => {
     // 1. جلب المنتجات
+   // 1. جلب المنتجات
     const fetchProducts = async () => {
-      const { data } = await supabase.from('products').select('*');
-      if (data) setAllProducts(data);
+      // 🛑 أوقفنا الاتصال بـ supabase مؤقتاً
+      // const { data } = await supabase.from('products').select('*');
+      
+      // ✅ سنستخدم البيانات المحلية حالياً
+      setAllProducts(carDatabase); 
     };
     fetchProducts();
 
