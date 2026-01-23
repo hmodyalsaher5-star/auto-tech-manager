@@ -5,24 +5,47 @@ import Footer from './components/Footer'
 import ProductCard from './components/ProductCard'
 import AddProductForm from './components/AddProductForm'
 import EditProductModal from './components/EditProductModal';
+import Login from './components/Login'; // 🆕 استيراد صفحة الدخول
 
 function App() {
   
+  // --- البيانات ---
   const [brands, setBrands] = useState([]);
   const [models, setModels] = useState([]);
   const [availableYears, setAvailableYears] = useState([]);
   const [displayedProducts, setDisplayedProducts] = useState([]);
   
-  // حالة المنتج الذي يتم تعديله حالياً (إذا كان فارغاً يعني النافذة مغلقة)
+  // --- التحكم والتعديل ---
   const [editingProduct, setEditingProduct] = useState(null);
-
   const [selectedBrandId, setSelectedBrandId] = useState("");
   const [selectedModelId, setSelectedModelId] = useState("");
   const [selectedYear, setSelectedYear] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const [userRole, setUserRole] = useState('guest'); 
+  // --- 🆕 نظام الدخول الحقيقي (Auth) ---
+  const [session, setSession] = useState(null); // هل المستخدم مسجل دخول؟
+  const [showLoginModal, setShowLoginModal] = useState(false); // هل نافذة الدخول مفتوحة؟
   const [showAdminPanel, setShowAdminPanel] = useState(false);
+
+  // 1️⃣ مراقبة حالة الدخول (The Session Monitor)
+  useEffect(() => {
+    // التحقق عند فتح الموقع
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    // الاستماع للتغييرات (دخول/خروج)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) {
+        setShowLoginModal(false); // إغلاق نافذة الدخول تلقائياً عند النجاح
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // جلب البيانات الأولية
   useEffect(() => {
@@ -86,7 +109,6 @@ function App() {
 
           const { data: screens } = await screensQuery;
 
-          // إضافة اسم الجدول لنعرف من أين نحذف أو نعدل
           const allItems = [
             ...(frames || []).map(f => ({ ...f, type: 'إطار/ديكور 🖼️', table: 'frames' })),
             ...(screens || []).map(s => ({ ...s, type: 'شاشة إلكترونية 📺', table: 'screens' }))
@@ -105,7 +127,7 @@ function App() {
     fetchProducts();
   }, [selectedYear, selectedModelId]);
 
-  // --- دالة الحذف ---
+  // --- دوال التحكم ---
   const handleDeleteProduct = async (productId, tableName) => {
     if (!window.confirm("هل أنت متأكد أنك تريد حذف هذا المنتج نهائياً من قاعدة البيانات؟")) return;
 
@@ -122,7 +144,6 @@ function App() {
     }
   };
 
-  // --- 🆕 دالة تحديث المنتج محلياً بعد التعديل ---
   const handleProductUpdate = (updatedProduct) => {
     setDisplayedProducts(prevProducts => 
         prevProducts.map(p => 
@@ -151,32 +172,49 @@ function App() {
     setDisplayedProducts([]);
   };
 
-  const loginAsAdmin = () => { setUserRole('admin'); setShowAdminPanel(true); };
-  const loginAsSupervisor = () => { setUserRole('supervisor'); setShowAdminPanel(true); };
-  const logout = () => { setUserRole('guest'); setShowAdminPanel(false); };
+  // 🆕 دالة تسجيل الخروج
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setShowAdminPanel(false);
+  };
+
+  // تحديد هل المستخدم الحالي "أدمن"
+  const isAdmin = session !== null; 
 
   return (
     <div className="bg-gray-900 min-h-screen text-white font-sans flex flex-col dir-rtl">
       <Header />
-      <div className="bg-yellow-600 p-2 text-center text-black font-bold">
-        🛠️ وضع المدير (Vercel Live):
-        <div className="mt-2 flex justify-center gap-4">
-            <button onClick={loginAsAdmin} className={`px-3 py-1 rounded border-2 border-black ${userRole === 'admin' ? 'bg-white' : 'bg-yellow-400'}`}>👨‍✈️ مدير</button>
-            <button onClick={loginAsSupervisor} className={`px-3 py-1 rounded border-2 border-black ${userRole === 'supervisor' ? 'bg-white' : 'bg-yellow-400'}`}>👷 مشرف</button>
-            <button onClick={logout} className={`px-3 py-1 rounded border-2 border-black ${userRole === 'guest' ? 'bg-white' : 'bg-yellow-400'}`}>👤 زائر</button>
-        </div>
+      
+      {/* 🆕 شريط حالة المستخدم (بديل الأزرار الصفراء) */}
+      <div className="bg-gray-800 border-b border-gray-700 p-2 flex justify-between items-center px-4 shadow-md">
+         <span className="text-gray-400 text-sm">
+            {session ? `👤 مسجل دخول: ${session.user.email}` : '👤 وضع الزائر'}
+         </span>
+         
+         <div>
+             {session ? (
+                 <button onClick={handleLogout} className="text-red-400 text-sm hover:text-red-300 font-bold underline transition">
+                     تسجيل خروج ⬅️
+                 </button>
+             ) : (
+                 <button onClick={() => setShowLoginModal(true)} className="text-blue-400 text-sm hover:text-blue-300 font-bold underline transition">
+                     دخول الإدارة 🔐
+                 </button>
+             )}
+         </div>
       </div>
 
-      {userRole !== 'guest' && (
-        <div className="container mx-auto p-4 bg-gray-800 flex justify-between items-center mb-4">
-            <span>أهلاً {userRole}</span>
-            <button onClick={() => setShowAdminPanel(!showAdminPanel)} className="bg-blue-600 px-4 py-2 rounded text-sm">
+      {/* زر لوحة التحكم (يظهر فقط للمدير) */}
+      {isAdmin && (
+        <div className="container mx-auto p-4 bg-gray-800 flex justify-between items-center mb-4 mt-4 rounded border border-blue-900 shadow-sm">
+            <span className="text-blue-300 font-bold">🛠️ لوحة التحكم</span>
+            <button onClick={() => setShowAdminPanel(!showAdminPanel)} className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-sm transition">
                 {showAdminPanel ? "إخفاء اللوحة" : "إضافة منتج جديد ➕"}
             </button>
         </div>
       )}
 
-      {showAdminPanel && userRole !== 'guest' && (
+      {showAdminPanel && isAdmin && (
           <div className="container mx-auto px-8 mb-8 border-b border-gray-700 pb-8">
              <AddProductForm />
           </div>
@@ -209,9 +247,10 @@ function App() {
               <ProductCard 
                 key={`${product.table}-${product.id}`}
                 product={product} 
-                userRole={userRole} 
+                // نمرر الدور بناء على الجلسة الحقيقية
+                userRole={isAdmin ? 'admin' : 'guest'} 
                 onDelete={handleDeleteProduct}
-                onEdit={setEditingProduct} // 🆕 تفعيل زر التعديل
+                onEdit={setEditingProduct} 
               />
             ))
           ) : (
@@ -222,7 +261,19 @@ function App() {
         </div>
       </main>
 
-      {/* 🆕 نافذة التعديل المنبثقة */}
+      {/* 🆕 نافذة تسجيل الدخول */}
+      {showLoginModal && (
+          <>
+            {/* خلفية تغلق النافذة عند الضغط عليها */}
+            <div className="fixed inset-0 z-40 bg-black bg-opacity-50" onClick={() => setShowLoginModal(false)}></div>
+            <div className="z-50 relative pointer-events-auto">
+                 {/* نمرر دالة الإغلاق لزر الإلغاء */}
+                 <Login onClose={() => setShowLoginModal(false)} />
+            </div>
+          </>
+      )}
+
+      {/* نافذة التعديل المنبثقة */}
       {editingProduct && (
         <EditProductModal 
             product={editingProduct}
