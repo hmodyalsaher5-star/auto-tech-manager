@@ -1,94 +1,50 @@
-import { useState } from 'react'
-// import { supabase } from '../supabase' // 👈 أوقفناها مؤقتاً لأننا في وضع التجربة المحلية
-import EditModal from './EditModal'
+import React from 'react';
 
-// 1. نستقبل userRole بدلاً من isAdmin
-function ProductCard({ product, userRole }) {
-  const [showEditModal, setShowEditModal] = useState(false);
-
-  // دالة الحذف (تم تعديلها للمحاكاة)
-  const handleDelete = async () => {
-    // التحقق: هل أنت مدير؟ (حماية إضافية)
-    if (userRole !== 'admin') {
-      alert("⛔ ليس لديك صلاحية الحذف!");
-      return;
-    }
-
-    const isConfirmed = confirm(`هل أنت متأكد أنك تريد حذف: ${product.name}؟ \n(ملاحظة: هذا حذف تجريبي لأننا نستخدم بيانات محلية)`);
-    
-    if (isConfirmed) {
-      // 🛑 كود Supabase القديم (سنعيده لاحقاً)
-      // const { error } = await supabase.from('products').delete().eq('id', product.id);
-      // if (error) alert("❌ خطأ"); else window.location.reload();
-      
-      // ✅ كود التجربة الحالي:
-      alert("✅ تمت عملية الحذف بنجاح (محاكاة)!");
-    }
-  };
-
+// لاحظ أننا نستقبل خاصية جديدة اسمها onDelete
+export default function ProductCard({ product, userRole, onDelete }) {
+  
   return (
-    <>
-      <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 hover:border-blue-500 transition-all shadow-lg relative group">
-        
-        {/* التعامل الذكي مع الصور: إذا كانت من النت يعرضها، وإذا محلية يعرض بديل */}
-        <img 
-          src={product.image_url || product.image || "https://placehold.co/600x400?text=Auto+Part"} 
-          alt={product.name} 
-          className="w-full h-48 object-cover rounded-lg mb-4 bg-gray-900"
-        />
-
-        <div className="flex justify-between items-start mb-2">
-          <h3 className="text-lg font-bold text-white">{product.name}</h3>
-          <span className="bg-blue-900 text-blue-200 text-xs px-2 py-1 rounded-full">
-            {product.year}
-          </span>
-        </div>
-
-        <p className="text-gray-400 text-sm mb-4">
-          {product.brand} - {product.model}
-        </p>
-
-        <div className="flex justify-between items-center mt-4 border-t border-gray-700 pt-4">
-          <span className="text-green-400 font-bold text-xl">{product.price}</span>
-          
-          {/* 2. منطقة الأزرار: تظهر للمدير والمشرف فقط (ليس للزائر) */}
-          {userRole !== 'guest' && (
-            <div className="flex gap-2">
-              
-              {/* زر التعديل: يظهر للجميع (مدير ومشرف) */}
-              <button 
-                onClick={() => setShowEditModal(true)} 
-                className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded transition-colors"
-                title="تعديل المنتج"
-              >
-                ✏️
-              </button>
-
-              {/* 3. زر الحذف: يظهر للمدير (admin) فـقـط */}
-              {userRole === 'admin' && (
-                <button 
-                  onClick={handleDelete}
-                  className="bg-red-600 hover:bg-red-700 text-white p-2 rounded transition-colors"
-                  title="حذف المنتج"
-                >
-                  🗑️
-                </button>
-              )}
-            </div>
-          )}
-          
-        </div>
-
+    <div className="bg-gray-700 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative border border-gray-600">
+      
+      {/* صورة المنتج */}
+      <div className="h-48 overflow-hidden bg-gray-800 flex items-center justify-center">
+        {product.image_url ? (
+            <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+        ) : (
+            <span className="text-gray-500">لا توجد صورة</span>
+        )}
       </div>
 
-      {showEditModal && (
-        <EditModal 
-          product={product} 
-          onClose={() => setShowEditModal(false)} 
-        />
-      )}
-    </>
-  )
-}
+      {/* المحتوى */}
+      <div className="p-4">
+        {/* التسمية التوضيحية (شاشة / إطار) */}
+        <div className="flex justify-between items-start mb-2">
+            <span className={`text-xs px-2 py-1 rounded-full ${product.table === 'frames' ? 'bg-blue-900 text-blue-200' : 'bg-purple-900 text-purple-200'}`}>
+                {product.type}
+            </span>
+            <span className="text-green-400 font-bold text-lg">{product.price} ر.س</span>
+        </div>
 
-export default ProductCard
+        <h3 className="text-xl font-bold mb-2 text-white">{product.name}</h3>
+        
+        {product.specs && (
+            <p className="text-gray-400 text-sm mb-4 line-clamp-2">{product.specs}</p>
+        )}
+
+        <button className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-2 px-4 rounded transition duration-200">
+          أضف للسلة 🛒
+        </button>
+
+        {/* 🗑️ زر الحذف (يظهر فقط للمدير) */}
+        {userRole === 'admin' && (
+          <button 
+            onClick={() => onDelete(product.id, product.table)} // استدعاء دالة الحذف
+            className="w-full mt-3 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition duration-200 flex items-center justify-center gap-2"
+          >
+            🗑️ حذف المنتج
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
