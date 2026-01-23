@@ -4,12 +4,17 @@ import Header from './components/Header'
 import Footer from './components/Footer'
 import ProductCard from './components/ProductCard'
 import AddProductForm from './components/AddProductForm'
+import EditProductModal from './components/EditProductModal';
 
 function App() {
+  
   const [brands, setBrands] = useState([]);
   const [models, setModels] = useState([]);
   const [availableYears, setAvailableYears] = useState([]);
   const [displayedProducts, setDisplayedProducts] = useState([]);
+  
+  // حالة المنتج الذي يتم تعديله حالياً (إذا كان فارغاً يعني النافذة مغلقة)
+  const [editingProduct, setEditingProduct] = useState(null);
 
   const [selectedBrandId, setSelectedBrandId] = useState("");
   const [selectedModelId, setSelectedModelId] = useState("");
@@ -81,7 +86,7 @@ function App() {
 
           const { data: screens } = await screensQuery;
 
-          // 🆕 التعديل هنا: أضفنا (table name) لنعرف من أين نحذف
+          // إضافة اسم الجدول لنعرف من أين نحذف أو نعدل
           const allItems = [
             ...(frames || []).map(f => ({ ...f, type: 'إطار/ديكور 🖼️', table: 'frames' })),
             ...(screens || []).map(s => ({ ...s, type: 'شاشة إلكترونية 📺', table: 'screens' }))
@@ -100,24 +105,32 @@ function App() {
     fetchProducts();
   }, [selectedYear, selectedModelId]);
 
-  // --- 🆕 دالة الحذف الجديدة ---
+  // --- دالة الحذف ---
   const handleDeleteProduct = async (productId, tableName) => {
-    // 1. تأكيد الحذف
     if (!window.confirm("هل أنت متأكد أنك تريد حذف هذا المنتج نهائياً من قاعدة البيانات؟")) return;
 
-    // 2. الحذف من Supabase
     const { error } = await supabase
-        .from(tableName) // نستخدم اسم الجدول المرسل (frames أو screens)
+        .from(tableName)
         .delete()
         .eq('id', productId);
 
     if (error) {
         alert("حدث خطأ أثناء الحذف: " + error.message);
     } else {
-        // 3. تحديث الشاشة فوراً (حذف المنتج من القائمة المعروضة)
         setDisplayedProducts(prev => prev.filter(item => item.id !== productId || item.table !== tableName));
         alert("تم الحذف بنجاح 🗑️");
     }
+  };
+
+  // --- 🆕 دالة تحديث المنتج محلياً بعد التعديل ---
+  const handleProductUpdate = (updatedProduct) => {
+    setDisplayedProducts(prevProducts => 
+        prevProducts.map(p => 
+            (p.id === updatedProduct.id && p.table === updatedProduct.table) 
+            ? updatedProduct 
+            : p
+        )
+    );
   };
 
   const handleBrandChange = (e) => {
@@ -194,10 +207,11 @@ function App() {
           ) : displayedProducts.length > 0 ? (
             displayedProducts.map((product) => (
               <ProductCard 
-                key={`${product.table}-${product.id}`} // مفتاح فريد
+                key={`${product.table}-${product.id}`}
                 product={product} 
                 userRole={userRole} 
-                onDelete={handleDeleteProduct} // 🆕 مررنا دالة الحذف هنا
+                onDelete={handleDeleteProduct}
+                onEdit={setEditingProduct} // 🆕 تفعيل زر التعديل
               />
             ))
           ) : (
@@ -207,6 +221,16 @@ function App() {
           )}
         </div>
       </main>
+
+      {/* 🆕 نافذة التعديل المنبثقة */}
+      {editingProduct && (
+        <EditProductModal 
+            product={editingProduct}
+            onClose={() => setEditingProduct(null)}
+            onUpdate={handleProductUpdate}
+        />
+      )}
+
       <Footer />
     </div>
   )
