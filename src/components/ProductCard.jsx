@@ -1,67 +1,75 @@
-import React from 'react';
+// حذفنا { useState } لأننا لا نحتاجها هنا
+import React from 'react'; 
 
-export default function ProductCard({ product, userRole, onDelete, onEdit }) {
+function ProductCard({ product, userRole, onDelete, onEdit }) {
+  // تحديد رمز العملة للعرض
+  const currencySymbol = product.currency === 'IQD' ? 'د.ع' : '$';
   
-  // هل المستخدم لديه صلاحية التعديل؟ (مدير أو مشرف)
-  const canEdit = userRole === 'admin' || userRole === 'supervisor';
+  // تنسيق الرقم (الدينار يظهر بفواصل، الدولار كما هو)
+  const formattedPrice = product.currency === 'IQD' 
+    ? product.price.toLocaleString() 
+    : product.price;
 
   return (
-    <div className="bg-gray-700 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 relative border border-gray-600 flex flex-col h-full">
+    <div className="bg-gray-800 rounded-lg overflow-hidden shadow-lg border border-gray-700 flex flex-col hover:shadow-2xl transition-shadow duration-300 relative group">
       
-      {/* الصورة */}
-      <div className="h-48 overflow-hidden bg-gray-800 flex items-center justify-center relative group">
-        {product.image_url ? (
-            <img src={product.image_url} alt={product.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-        ) : (
-            <span className="text-gray-500">لا توجد صورة</span>
-        )}
+      {/* صورة المنتج */}
+      <div className="relative h-48 w-full bg-gray-900 overflow-hidden">
+         <img 
+           src={product.image_url || "https://via.placeholder.com/300?text=No+Image"} 
+           alt={product.name} 
+           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+         />
+         <div className="absolute top-0 right-0 bg-blue-600 text-white text-xs font-bold px-2 py-1 m-2 rounded shadow">
+           {product.type}
+         </div>
       </div>
 
-      {/* المحتوى */}
-      <div className="p-4 flex flex-col flex-grow">
-        <div className="flex justify-between items-start mb-2">
-            <span className={`text-xs px-2 py-1 rounded-full ${product.table === 'frames' ? 'bg-blue-900 text-blue-200' : 'bg-purple-900 text-purple-200'}`}>
-                {product.type}
-            </span>
-            <span className="text-green-400 font-bold text-lg">{product.price} 💰</span>
+      {/* تفاصيل المنتج */}
+      <div className="p-4 flex-grow flex flex-col justify-between">
+        <div>
+           <div className="flex justify-between items-start mb-2">
+              <h3 className="text-xl font-bold text-white leading-tight">{product.name || 'منتج بدون اسم'}</h3>
+           </div>
+           
+           {/* عرض السعر مع العملة */}
+           <div className="text-2xl font-bold text-yellow-400 mb-3 flex items-center gap-1">
+              <span>{formattedPrice}</span>
+              <span className="text-sm text-yellow-600">{currencySymbol}</span>
+           </div>
+           
+           <div className="space-y-1 text-sm text-gray-400 mb-4">
+              {product.screen_size && <p>📏 الحجم: <span className="text-gray-200">{product.screen_size}</span></p>}
+              {product.ram && <p>💾 الذاكرة: <span className="text-gray-200">{product.ram}</span></p>}
+              {product.processor && <p>⚙️ المعالج: <span className="text-gray-200">{product.processor}</span></p>}
+              {product.storage && <p>💽 التخزين: <span className="text-gray-200">{product.storage}</span></p>}
+              {product.details && <p className="mt-2 text-xs border-t border-gray-700 pt-2">{product.details}</p>}
+           </div>
         </div>
 
-        <h3 className="text-xl font-bold mb-2 text-white">{product.name}</h3>
-        
-        {product.specs && (
-            <p className="text-gray-400 text-sm mb-4 line-clamp-2">{product.specs}</p>
+        {/* أزرار التحكم */}
+        {(userRole === 'admin' || userRole === 'supervisor') && (
+           <div className="flex gap-2 mt-4 pt-4 border-t border-gray-700">
+               <button 
+                 onClick={() => onEdit(product)}
+                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded text-sm font-bold transition"
+               >
+                 ✏️ تعديل
+               </button>
+               
+               {userRole === 'admin' && (
+                 <button 
+                   onClick={() => onDelete(product.id, product.table)}
+                   className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded text-sm font-bold transition"
+                 >
+                   🗑️ حذف
+                 </button>
+               )}
+           </div>
         )}
-
-        {/* دفع الأزرار للأسفل دائماً */}
-        <div className="mt-auto pt-4 space-y-2">
-            <button className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-2 px-4 rounded transition duration-200">
-              أضف للسلة 🛒
-            </button>
-
-            {/* أزرار التحكم (للمدير والمشرف) */}
-            {canEdit && (
-              <div className="flex gap-2">
-                {/* زر التعديل */}
-                <button 
-                  onClick={() => onEdit(product)}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-2 rounded transition duration-200 text-sm"
-                >
-                  ✏️ تعديل
-                </button>
-                
-                {/* زر الحذف (للمدير فقط) */}
-                {userRole === 'admin' && (
-                  <button 
-                    onClick={() => onDelete(product.id, product.table)}
-                    className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-2 rounded transition duration-200 text-sm"
-                  >
-                    🗑️ حذف
-                  </button>
-                )}
-              </div>
-            )}
-        </div>
       </div>
     </div>
-  );
+  )
 }
+
+export default ProductCard

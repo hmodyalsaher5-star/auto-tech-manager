@@ -15,6 +15,7 @@ export default function AddProductForm() {
   const [formData, setFormData] = useState({
     name: '',
     price: '',
+    currency: 'USD', // 🆕 إضافة العملة (الافتراضي دولار)
     image_url: '',
     specs: '', // للشاشات فقط
     brand_id: '',
@@ -75,7 +76,7 @@ export default function AddProductForm() {
       let error;
 
       if (activeTab === 'frame') {
-        // 🖼️ إضافة إطار (يجب ربطه بجيل ومقاس)
+        // 🖼️ إضافة إطار
         if (!formData.generation_id || !formData.size_id) {
           throw new Error("الرجاء تحديد السيارة والمقاس للإطار");
         }
@@ -83,6 +84,7 @@ export default function AddProductForm() {
         const { error: err } = await supabase.from('frames').insert([{
           name: formData.name,
           price: parseInt(formData.price),
+          currency: formData.currency, // 🆕 إرسال العملة
           image_url: formData.image_url || 'https://via.placeholder.com/150',
           generation_id: parseInt(formData.generation_id),
           size_id: parseInt(formData.size_id)
@@ -90,7 +92,7 @@ export default function AddProductForm() {
         error = err;
 
       } else {
-        // 📺 إضافة شاشة (تربط بالمقاس بشكل أساسي)
+        // 📺 إضافة شاشة
         if (!formData.size_id && !formData.generation_id) {
             throw new Error("يجب تحديد المقاس (للعام) أو السيارة (للسبشل)");
         }
@@ -98,9 +100,9 @@ export default function AddProductForm() {
         const insertData = {
           name: formData.name,
           price: parseInt(formData.price),
+          currency: formData.currency, // 🆕 إرسال العملة
           image_url: formData.image_url || 'https://via.placeholder.com/150',
           specs: formData.specs,
-          // إذا اختار مقاس نرسله، وإذا اختار سيارة نرسلها
           size_id: formData.size_id ? parseInt(formData.size_id) : null,
           generation_id: formData.generation_id ? parseInt(formData.generation_id) : null
         };
@@ -112,8 +114,8 @@ export default function AddProductForm() {
       if (error) throw error;
 
       setMessage('✅ تم إضافة المنتج بنجاح!');
-      // تصفير الحقول
-      setFormData({ ...formData, name: '', price: '', specs: '' });
+      // تصفير الحقول (مع إعادة العملة للدولار)
+      setFormData({ ...formData, name: '', price: '', specs: '', currency: 'USD' });
 
     } catch (err) {
       setMessage(`❌ خطأ: ${err.message}`);
@@ -143,18 +145,31 @@ export default function AddProductForm() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         
-        {/* بيانات مشتركة (الاسم، السعر، الصورة) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* بيانات مشتركة */}
+        <div className="grid grid-cols-1 gap-4">
           <input 
             type="text" name="name" placeholder="اسم المنتج (مثال: إطار كامري / شاشة سوني)" 
             value={formData.name} onChange={handleChange} required
-            className="p-2 rounded bg-gray-800 border border-gray-500 text-white"
+            className="w-full p-2 rounded bg-gray-800 border border-gray-500 text-white"
           />
-          <input 
-            type="number" name="price" placeholder="السعر (ر.س)" 
-            value={formData.price} onChange={handleChange} required
-            className="p-2 rounded bg-gray-800 border border-gray-500 text-white"
-          />
+          
+          {/* 🆕 السعر والعملة بجانب بعض */}
+          <div className="flex gap-2">
+            <input 
+                type="number" name="price" placeholder="السعر" 
+                value={formData.price} onChange={handleChange} required
+                className="flex-grow p-2 rounded bg-gray-800 border border-gray-500 text-white"
+            />
+            <select 
+                name="currency" 
+                value={formData.currency} 
+                onChange={handleChange}
+                className="w-1/3 p-2 rounded bg-gray-800 border border-gray-500 text-white text-center font-bold"
+            >
+                <option value="USD">دولار ($)</option>
+                <option value="IQD">دينار (د.ع)</option>
+            </select>
+          </div>
         </div>
         
         <input 
@@ -174,19 +189,16 @@ export default function AddProductForm() {
 
         <hr className="border-gray-600 my-4" />
 
-        {/* 2. منطق الربط (الذكاء هنا) */}
-        
+        {/* 2. منطق الربط */}
         <div className="space-y-3 bg-gray-800 p-4 rounded">
             <h3 className="text-blue-300 font-bold">🔗 إعدادات التوافق:</h3>
             
-            {/* اختيار المقاس (مهم للطرفين) */}
             <select name="size_id" value={formData.size_id} onChange={handleChange} 
                 className="w-full p-2 rounded bg-gray-600 text-white border border-gray-500">
                 <option value="">-- اختر المقاس المعياري (مثل 9 بوصة) --</option>
                 {sizes.map(s => <option key={s.id} value={s.id}>{s.size_name}</option>)}
             </select>
 
-            {/* اختيار السيارة (اجباري للإطار - واختياري للشاشة السبشل) */}
             {(activeTab === 'frame' || activeTab === 'screen') && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                     <select name="brand_id" value={formData.brand_id} onChange={handleChange}

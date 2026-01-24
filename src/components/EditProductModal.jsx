@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { supabase } from '../supabase';
 
 export default function EditProductModal({ product, onClose, onUpdate }) {
+  // تهيئة البيانات (مع إضافة العملة)
   const [formData, setFormData] = useState({
     name: product.name,
     price: product.price,
+    currency: product.currency || 'USD', // 🆕 قراءة العملة الحالية أو افتراضياً دولار
     image_url: product.image_url || '',
-    specs: product.specs || '', // للشاشات فقط
+    specs: product.specs || '', 
   });
   
   const [loading, setLoading] = useState(false);
@@ -20,23 +22,21 @@ export default function EditProductModal({ product, onClose, onUpdate }) {
     setLoading(true);
 
     try {
-      // التحديث في Supabase بناءً على الجدول (إطارات أو شاشات)
       const { error } = await supabase
-        .from(product.table) // نعرف الجدول من بيانات المنتج نفسه
+        .from(product.table) 
         .update({
           name: formData.name,
           price: parseInt(formData.price),
+          currency: formData.currency, // 🆕 تحديث العملة
           image_url: formData.image_url,
-          // إذا كان الجدول شاشات، نحدث المواصفات، وإلا نتجاهلها
           ...(product.table === 'screens' && { specs: formData.specs }) 
         })
         .eq('id', product.id);
 
       if (error) throw error;
 
-      // إشعار الأب (App.jsx) بأن التحديث تم ليحدث الواجهة
       onUpdate({ ...product, ...formData });
-      onClose(); // إغلاق النافذة
+      onClose();
       alert("✅ تم تعديل المنتج بنجاح");
 
     } catch (error) {
@@ -59,12 +59,24 @@ export default function EditProductModal({ product, onClose, onUpdate }) {
             />
           </div>
 
+          {/* 🆕 قسم السعر والعملة */}
           <div>
-            <label className="text-gray-400 text-sm">السعر (ر.س)</label>
-            <input 
-              type="number" name="price" value={formData.price} onChange={handleChange} required
-              className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600"
-            />
+            <label className="text-gray-400 text-sm">السعر والعملة</label>
+            <div className="flex gap-2">
+                <input 
+                  type="number" name="price" value={formData.price} onChange={handleChange} required
+                  className="flex-grow p-2 rounded bg-gray-700 text-white border border-gray-600"
+                />
+                <select 
+                  name="currency" 
+                  value={formData.currency} 
+                  onChange={handleChange}
+                  className="w-1/3 p-2 rounded bg-gray-700 text-white border border-gray-600 font-bold text-center"
+                >
+                    <option value="USD">دولار ($)</option>
+                    <option value="IQD">دينار (د.ع)</option>
+                </select>
+            </div>
           </div>
 
           <div>
@@ -75,7 +87,6 @@ export default function EditProductModal({ product, onClose, onUpdate }) {
             />
           </div>
 
-          {/* عرض حقل المواصفات فقط إذا كان المنتج شاشة */}
           {product.table === 'screens' && (
             <div>
               <label className="text-gray-400 text-sm">المواصفات</label>
