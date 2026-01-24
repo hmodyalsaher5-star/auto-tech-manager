@@ -6,7 +6,8 @@ import ProductCard from './components/ProductCard'
 import AddProductForm from './components/AddProductForm'
 import EditProductModal from './components/EditProductModal';
 import Login from './components/Login';
-import UserManagement from './components/UserManagement'; // 🆕 استيراد لوحة الموظفين
+import UserManagement from './components/UserManagement'; // لوحة الموظفين
+import MasterDataManagement from './components/MasterDataManagement'; // 🆕 لوحة بيانات السيارات
 
 function App() {
   
@@ -17,7 +18,8 @@ function App() {
 
   // --- لوحات التحكم ---
   const [showAdminPanel, setShowAdminPanel] = useState(false);
-  const [showUserPanel, setShowUserPanel] = useState(false); // 🆕
+  const [showUserPanel, setShowUserPanel] = useState(false);
+  const [showMasterDataPanel, setShowMasterDataPanel] = useState(false); // 🆕 حالة لوحة السيارات
 
   // --- البيانات ---
   const [brands, setBrands] = useState([]);
@@ -32,15 +34,13 @@ function App() {
   const [selectedYear, setSelectedYear] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // 1️⃣ التحقق من المستخدم وتحديد الصلاحية (بوابة النظام)
+  // 1️⃣ التحقق من المستخدم وتحديد الصلاحية
   useEffect(() => {
     const checkUser = async () => {
-      // هل المستخدم مسجل دخول؟
       const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
 
       if (session) {
-        // إذا نعم، نبحث عن دوره في جدول الصلاحيات
         const { data: roleData } = await supabase
           .from('user_roles')
           .select('role')
@@ -50,7 +50,7 @@ function App() {
         if (roleData) {
           setUserRole(roleData.role);
         } else {
-          setUserRole('viewer'); // دور افتراضي لمن ليس له سجل
+          setUserRole('viewer');
         }
       }
       setAuthLoading(false);
@@ -58,13 +58,11 @@ function App() {
 
     checkUser();
 
-    // الاستماع لأي تغيير (دخول/خروج)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (!session) {
           setUserRole(null);
       } else {
-          // إعادة التحقق من الدور عند تبديل الحساب
           checkUser();
       }
     });
@@ -72,7 +70,7 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // --- جلب البيانات (يتم فقط إذا كان المستخدم مسجلاً) ---
+  // --- جلب البيانات ---
   useEffect(() => {
     if (session) {
         const fetchBrands = async () => {
@@ -81,7 +79,7 @@ function App() {
         };
         fetchBrands();
     }
-  }, [session]);
+  }, [session, showMasterDataPanel]); // 🆕 أضفنا showMasterDataPanel ليتحدث البحث عند إضافة شركة جديدة
 
   useEffect(() => {
     if (!selectedBrandId || !session) return;
@@ -90,7 +88,7 @@ function App() {
       setModels(data || []);
     };
     fetchModels();
-  }, [selectedBrandId, session]);
+  }, [selectedBrandId, session, showMasterDataPanel]); // 🆕 تحديث عند إضافة موديل
 
   useEffect(() => {
     if (!selectedModelId || !session) return;
@@ -105,7 +103,7 @@ function App() {
       }
     };
     fetchYears();
-  }, [selectedModelId, session]);
+  }, [selectedModelId, session, showMasterDataPanel]); // 🆕 تحديث عند إضافة سنوات
 
   useEffect(() => {
     if (!selectedYear || !selectedModelId || !session) return;
@@ -191,32 +189,27 @@ function App() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    // الصفحة ستتحدث تلقائياً وتعود لشاشة الدخول بسبب useEffect
   };
 
-  // 🔒🔒🔒 منطقة الحماية (Render Guard) 🔒🔒🔒
+  // 🔒🔒🔒 منطقة الحماية 🔒🔒🔒
 
-  // 1. شاشة التحميل
   if (authLoading) {
     return <div className="min-h-screen bg-gray-900 flex justify-center items-center text-white">جاري التحقق من الصلاحيات... 🔐</div>;
   }
 
-  // 2. حاجز الدخول: إذا لم يسجل، اعرض شاشة الدخول فقط
   if (!session) {
       return (
           <div className="bg-gray-900 min-h-screen flex flex-col justify-center items-center p-4">
                <h1 className="text-4xl font-bold text-yellow-500 mb-2">نظام إدارة المخزون 🚗</h1>
                <p className="text-gray-400 mb-8">يرجى تسجيل الدخول للوصول إلى النظام</p>
-               
                <div className="w-full max-w-md bg-gray-800 p-1 rounded-lg shadow-2xl">
-                   {/* نستخدم Login ونلغي خاصية الإغلاق لأنه لا يوجد مكان يذهب إليه */}
                    <Login onClose={() => {}} /> 
                </div>
           </div>
       );
   }
 
-  // 🔓🔓🔓 التطبيق الرئيسي (للمسجلين فقط) 🔓🔓🔓
+  // 🔓🔓🔓 التطبيق الرئيسي 🔓🔓🔓
 
   return (
     <div className="bg-gray-900 min-h-screen text-white font-sans flex flex-col dir-rtl">
@@ -231,43 +224,62 @@ function App() {
                  <p className="text-xs text-gray-400">الصلاحية: <span className="uppercase font-bold text-blue-300">{userRole}</span></p>
             </div>
          </div>
-         
          <button onClick={handleLogout} className="text-red-400 text-sm hover:text-red-300 font-bold underline transition">
              تسجيل خروج ⬅️
          </button>
       </div>
 
-      {/* منطقة أزرار التحكم (تظهر حسب الدور) */}
+      {/* 🆕 منطقة أزرار التحكم (تم توسيعها) */}
       {(userRole === 'admin' || userRole === 'supervisor') && (
-        <div className="container mx-auto p-4 mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* زر إدارة المنتجات (Admin + Supervisor) */}
+        <div className="container mx-auto p-4 mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+            
+            {/* 1. إدارة المنتجات */}
             <button 
-                onClick={() => { setShowAdminPanel(!showAdminPanel); setShowUserPanel(false); }} 
+                onClick={() => { setShowAdminPanel(!showAdminPanel); setShowUserPanel(false); setShowMasterDataPanel(false); }} 
                 className={`p-3 rounded text-center font-bold border transition ${showAdminPanel ? 'bg-blue-800 border-blue-500' : 'bg-blue-900 border-blue-800 hover:bg-blue-800'}`}
             >
-                {showAdminPanel ? "إخفاء لوحة المنتجات ⬆️" : "إدارة المنتجات (إضافة) 📦"}
+                {showAdminPanel ? "إخفاء المنتجات ⬆️" : "إضافة منتجات 📦"}
             </button>
 
-            {/* زر إدارة الموظفين (Admin Only) */}
+            {/* 2. إدارة بيانات السيارات (جديد - للمدير فقط) */}
             {userRole === 'admin' && (
                 <button 
-                    onClick={() => { setShowUserPanel(!showUserPanel); setShowAdminPanel(false); }} 
+                    onClick={() => { setShowMasterDataPanel(!showMasterDataPanel); setShowAdminPanel(false); setShowUserPanel(false); }} 
+                    className={`p-3 rounded text-center font-bold border transition ${showMasterDataPanel ? 'bg-green-800 border-green-500' : 'bg-green-900 border-green-800 hover:bg-green-800'}`}
+                >
+                    {showMasterDataPanel ? "إخفاء السيارات ⬆️" : "تعريف السيارات 🚗"}
+                </button>
+            )}
+
+            {/* 3. إدارة الموظفين (للمدير فقط) */}
+            {userRole === 'admin' && (
+                <button 
+                    onClick={() => { setShowUserPanel(!showUserPanel); setShowAdminPanel(false); setShowMasterDataPanel(false); }} 
                     className={`p-3 rounded text-center font-bold border transition ${showUserPanel ? 'bg-purple-800 border-purple-500' : 'bg-purple-900 border-purple-800 hover:bg-purple-800'}`}
                 >
-                    {showUserPanel ? "إخفاء لوحة الموظفين ⬆️" : "إدارة الموظفين والصلاحيات 👥"}
+                    {showUserPanel ? "إخفاء الموظفين ⬆️" : "الموظفين 👥"}
                 </button>
             )}
         </div>
       )}
 
-      {/* عرض لوحة إضافة المنتجات */}
+      {/* عرض اللوحات المختلفة */}
+
+      {/* 1. لوحة إضافة المنتجات */}
       {showAdminPanel && (userRole === 'admin' || userRole === 'supervisor') && (
           <div className="container mx-auto px-8 mb-8 border-b border-gray-700 pb-8">
              <AddProductForm />
           </div>
       )}
 
-      {/* عرض لوحة إدارة الموظفين */}
+      {/* 2. لوحة تعريف السيارات (جديد) */}
+      {showMasterDataPanel && userRole === 'admin' && (
+          <div className="container mx-auto px-8 mb-8 border-b border-gray-700 pb-8">
+             <MasterDataManagement />
+          </div>
+      )}
+
+      {/* 3. لوحة إدارة الموظفين */}
       {showUserPanel && userRole === 'admin' && (
           <div className="container mx-auto px-8 mb-8 border-b border-gray-700 pb-8">
              <UserManagement />
@@ -301,7 +313,7 @@ function App() {
               <ProductCard 
                 key={`${product.table}-${product.id}`}
                 product={product} 
-                userRole={userRole} // نمرر الدور الحقيقي
+                userRole={userRole} 
                 onDelete={handleDeleteProduct}
                 onEdit={setEditingProduct} 
               />
