@@ -4,137 +4,115 @@ import { supabase } from '../supabase';
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
   const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserRole, setNewUserRole] = useState('viewer');
   const [loading, setLoading] = useState(false);
 
-  // 🔄 دالة نجلب بها البيانات (نستخدمها للأزرار فقط)
-  const refreshUsers = async () => {
+  // دالة لجلب المستخدمين (تستخدم عند الإضافة أو الحذف)
+  const fetchUsersManual = async () => {
     const { data, error } = await supabase.from('user_roles').select('*');
-    if (!error) setUsers(data);
+    if (error) console.error('Error fetching users:', error);
+    else setUsers(data);
   };
 
-  // 🚀 التحميل عند فتح الصفحة (نكتب الكود داخله مباشرة لتجنب الأخطاء)
+  // ✅ الإصلاح: التحميل الأولي داخل useEffect بشكل منفصل لمنع التكرار
   useEffect(() => {
-    const fetchInitialData = async () => {
-      const { data, error } = await supabase.from('user_roles').select('*');
-      if (!error) setUsers(data);
+    let isMounted = true;
+    const initFetch = async () => {
+        const { data, error } = await supabase.from('user_roles').select('*');
+        if (isMounted && !error) setUsers(data);
     };
-    
-    fetchInitialData();
+    initFetch();
+    return () => { isMounted = false; };
   }, []);
 
-  // --- إضافة مستخدم ---
   const handleAddUser = async (e) => {
     e.preventDefault();
-    if (!newUserEmail) return;
     setLoading(true);
 
-    const { error } = await supabase.from('user_roles').insert([
-      { email: newUserEmail, role: newUserRole }
-    ]);
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: newUserEmail,
+      password: newUserPassword,
+    });
 
-    if (error) {
-      alert("❌ خطأ: " + error.message);
-    } else {
-      alert("✅ تم إضافة صلاحية الموظف بنجاح");
-      setNewUserEmail('');
-      refreshUsers(); // تحديث القائمة
+    if (authError) {
+      alert("فشل إنشاء الحساب: " + authError.message);
+      setLoading(false);
+      return;
+    }
+
+    if (authData.user) {
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .insert([{ 
+            id: authData.user.id, 
+            email: newUserEmail, 
+            role: newUserRole 
+        }]);
+
+      if (roleError) {
+        alert("فشل تحديد الصلاحية: " + roleError.message);
+      } else {
+        alert("✅ تم إضافة الموظف بنجاح!");
+        setNewUserEmail('');
+        setNewUserPassword('');
+        fetchUsersManual(); // تحديث القائمة يدوياً هنا
+      }
     }
     setLoading(false);
   };
 
-  // --- حذف مستخدم ---
-  const handleDeleteUser = async (id) => {
-    if (!window.confirm("هل أنت متأكد من سحب الصلاحيات؟")) return;
-    
-    const { error } = await supabase.from('user_roles').delete().eq('id', id);
-    if (!error) refreshUsers(); // تحديث القائمة
+  const handleUpdateRole = async (userId, newRole) => {
+    const { error } = await supabase.from('user_roles').update({ role: newRole }).eq('id', userId);
+    if (error) alert("فشل التعديل");
+    else { alert("✅ تم التعديل"); fetchUsersManual(); }
   };
 
-  // --- تعديل دور مستخدم ---
-  const handleUpdateRole = async (id, newRole) => {
-    const { error } = await supabase.from('user_roles').update({ role: newRole }).eq('id', id);
-    if (!error) {
-        refreshUsers(); // تحديث القائمة
-        alert("تم تعديل الصلاحية 👍");
-    }
+  const handleDeleteUser = async (userId) => {
+    if(!window.confirm("هل أنت متأكد؟")) return;
+    const { error } = await supabase.from('user_roles').delete().eq('id', userId);
+    if (!error) { alert("تم الحذف"); fetchUsersManual(); }
   };
 
   return (
-    <div className="bg-gray-800 p-6 rounded-lg border border-gray-600 shadow-xl mb-8">
-      <h3 className="text-xl font-bold text-yellow-400 mb-4 border-b border-gray-600 pb-2">👥 إدارة صلاحيات الموظفين</h3>
-
-      {/* نموذج الإضافة */}
-      <form onSubmit={handleAddUser} className="flex flex-col md:flex-row gap-4 mb-6 bg-gray-900 p-4 rounded">
-        <input 
-          type="email" 
-          placeholder="إيميل الموظف (يجب أن يكون مسجلاً في Supabase)" 
-          value={newUserEmail}
-          onChange={(e) => setNewUserEmail(e.target.value)}
-          className="flex-grow p-2 rounded bg-gray-700 text-white border border-gray-600"
-          required
-        />
-        <select 
-          value={newUserRole} 
-          onChange={(e) => setNewUserRole(e.target.value)}
-          className="p-2 rounded bg-gray-700 text-white border border-gray-600"
-        >
-          <option value="viewer">Viewer (مشاهد فقط)</option>
-          <option value="supervisor">Supervisor (مشرف)</option>
-          <option value="admin">Admin (مدير)</option>
-        </select>
-        <button 
-          type="submit" 
-          disabled={loading}
-          className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded font-bold"
-        >
-          {loading ? 'جاري الإضافة...' : 'إضافة صلاحية ➕'}
-        </button>
+    <div className="bg-gray-800 p-6 rounded-lg shadow-lg text-right dir-rtl animate-fadeIn">
+      <h2 className="text-2xl font-bold text-purple-400 mb-6 border-b border-gray-700 pb-2">👥 إدارة الموظفين</h2>
+      
+      <form onSubmit={handleAddUser} className="mb-8 bg-gray-900 p-4 rounded border border-gray-700">
+        <h3 className="text-lg font-bold text-white mb-4">إضافة موظف جديد</h3>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <input type="email" required placeholder="البريد الإلكتروني" value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} className="p-2 rounded bg-gray-800 border border-gray-600 text-white" />
+          <input type="password" required placeholder="كلمة المرور" value={newUserPassword} onChange={e => setNewUserPassword(e.target.value)} className="p-2 rounded bg-gray-800 border border-gray-600 text-white" />
+          <select value={newUserRole} onChange={e => setNewUserRole(e.target.value)} className="p-2 rounded bg-gray-800 border border-gray-600 text-white font-bold">
+            <option value="admin">🔴 مدير عام</option>
+            <option value="supervisor">🟡 مشرف عام</option>
+            <option value="viewer">🟢 زائر</option>
+            <option value="warehouse_worker">📦 موظف مخزن</option>
+            <option value="warehouse_supervisor">📋 مشرف مخزن</option>
+          </select>
+          <button disabled={loading} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded">{loading ? "جاري..." : "إضافة +"}</button>
+        </div>
       </form>
 
-      {/* جدول المستخدمين */}
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-gray-300">
-          <thead className="text-gray-400 uppercase bg-gray-700 text-xs">
-            <tr>
-              <th className="px-4 py-3">البريد الإلكتروني</th>
-              <th className="px-4 py-3">الصلاحية الحالية</th>
-              <th className="px-4 py-3 text-right">تحكم</th>
-            </tr>
+        <table className="w-full text-right bg-gray-700 rounded-lg overflow-hidden">
+          <thead className="bg-gray-900 text-white">
+            <tr><th className="p-3">البريد</th><th className="p-3">الصلاحية</th><th className="p-3">تغيير</th><th className="p-3">حذف</th></tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-gray-600">
             {users.map((user) => (
-              <tr key={user.id} className="border-b border-gray-700 hover:bg-gray-750">
-                <td className="px-4 py-3 font-medium text-white">{user.email}</td>
-                <td className="px-4 py-3">
-                  <select 
-                    value={user.role} 
-                    onChange={(e) => handleUpdateRole(user.id, e.target.value)}
-                    className={`bg-transparent border-b border-gray-500 text-sm focus:outline-none ${
-                        user.role === 'admin' ? 'text-red-400' : 
-                        user.role === 'supervisor' ? 'text-yellow-400' : 'text-blue-400'
-                    }`}
-                  >
-                    <option value="viewer" className="bg-gray-800 text-blue-400">Viewer</option>
-                    <option value="supervisor" className="bg-gray-800 text-yellow-400">Supervisor</option>
-                    <option value="admin" className="bg-gray-800 text-red-400">Admin</option>
-                  </select>
+              <tr key={user.id} className="hover:bg-gray-650">
+                <td className="p-3 text-gray-200">{user.email}</td>
+                <td className="p-3"><span className="px-2 py-1 rounded text-xs font-bold bg-blue-900 text-blue-200">{user.role}</span></td>
+                <td className="p-3">
+                   <select value={user.role} onChange={(e) => handleUpdateRole(user.id, e.target.value)} className="bg-gray-800 border border-gray-600 text-white text-sm p-1 rounded">
+                        <option value="admin">مدير</option><option value="supervisor">مشرف</option><option value="viewer">زائر</option>
+                        <option value="warehouse_worker">موظف مخزن</option><option value="warehouse_supervisor">مشرف مخزن</option>
+                   </select>
                 </td>
-                <td className="px-4 py-3 text-right">
-                  <button 
-                    onClick={() => handleDeleteUser(user.id)}
-                    className="text-red-500 hover:text-red-700 font-bold text-sm bg-gray-900 px-3 py-1 rounded"
-                  >
-                    سحب الصلاحية 🗑️
-                  </button>
-                </td>
+                <td className="p-3"><button onClick={() => handleDeleteUser(user.id)} className="text-red-400 font-bold">&times;</button></td>
               </tr>
             ))}
-            {users.length === 0 && (
-                <tr>
-                    <td colSpan="3" className="text-center py-4 text-gray-500">لا يوجد موظفين مضافين بعد.</td>
-                </tr>
-            )}
           </tbody>
         </table>
       </div>
