@@ -7,14 +7,13 @@ import TransactionModal from './TransactionModal';
 import MaintenanceModal from './MaintenanceModal';
 import ProductHistoryModal from './ProductHistoryModal';
 
-// 🆕 نستقبل userRole كـ prop
 export default function WarehouseManagement({ userRole }) {
   
-  // تحديد هل المستخدم "مشرف مخزن" فقط؟
-  const isSupervisorOnly = userRole === 'warehouse_supervisor';
+  // هل المستخدم مشرف فقط؟ (للقراءة فقط)
+  const isSupervisor = userRole === 'warehouse_supervisor';
 
-  // إذا كان مشرفاً، نبدأ بتبويب السجلات، وإلا نبدأ بالمخزون
-  const [activeTab, setActiveTab] = useState(isSupervisorOnly ? 'logs' : 'inventory'); 
+  // ✅ التعديل 1: السماح للمشرف بالبدء في تبويب المخزون عادي
+  const [activeTab, setActiveTab] = useState('inventory'); 
   
   const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState([]);
@@ -39,9 +38,7 @@ export default function WarehouseManagement({ userRole }) {
     const fetchData = async () => {
         setLoading(true);
         if (activeTab === 'inventory') {
-            // المشرف لا يحتاج تحميل المخزون لأنه ممنوع من رؤيته
-            if (isSupervisorOnly) return; 
-
+            // ✅ التعديل 2: حذفنا شرط (if isSupervisor return) ليتمكن من جلب البيانات
             const { data: frames } = await supabase.from('frames').select('*').order('id');
             const { data: screens } = await supabase.from('screens').select('*').order('id');
             const { data: sizesData } = await supabase.from('standard_sizes').select('*');
@@ -62,12 +59,12 @@ export default function WarehouseManagement({ userRole }) {
     };
     fetchData();
     return () => { isMounted = false };
-  }, [activeTab, isSupervisorOnly]);
+  }, [activeTab]); // ✅ حذفنا isSupervisor من هنا
 
   // دالة التحديث
   const refreshData = async () => {
       setLoading(true);
-      if (activeTab === 'inventory' && !isSupervisorOnly) {
+      if (activeTab === 'inventory') {
           const { data: frames } = await supabase.from('frames').select('*').order('id');
           const { data: screens } = await supabase.from('screens').select('*').order('id');
           const allItems = [
@@ -99,7 +96,7 @@ export default function WarehouseManagement({ userRole }) {
 
   const filteredLogs = logs.filter(log => filterLogType === 'all' || log.movement_type === filterLogType);
 
-  // دوال الحركات (لن تظهر للمشرف، ولكن نبقيها للكود)
+  // دوال الحركات (تبقى كما هي)
   const handleTransactionSubmit = async (data) => {
     const { item, type, quantity, reason, refNumber, notes } = data;
     const qty = parseInt(quantity);
@@ -159,19 +156,15 @@ export default function WarehouseManagement({ userRole }) {
         <div className="flex flex-col md:flex-row justify-between items-center border-b border-gray-700 pb-4 gap-4">
             <div><h1 className="text-2xl font-bold text-gray-100">🏭 إدارة المستودع</h1></div>
             <div className="flex bg-gray-800 p-1 rounded-lg">
-                
-                {/* 🔒 إخفاء زر المخزون إذا كان المستخدم مشرف مخزن */}
-                {!isSupervisorOnly && (
-                    <button onClick={() => setActiveTab('inventory')} className={`px-6 py-2 rounded-md font-bold transition ${activeTab === 'inventory' ? 'bg-blue-600 text-white' : 'text-gray-400'}`}>📦 المخزون</button>
-                )}
-                
+                {/* ✅ التعديل 3: إزالة شرط إخفاء الزر للمشرف */}
+                <button onClick={() => setActiveTab('inventory')} className={`px-6 py-2 rounded-md font-bold transition ${activeTab === 'inventory' ? 'bg-blue-600 text-white' : 'text-gray-400'}`}>📦 المخزون</button>
                 <button onClick={() => setActiveTab('logs')} className={`px-6 py-2 rounded-md font-bold transition ${activeTab === 'logs' ? 'bg-orange-600 text-white' : 'text-gray-400'}`}>📜 السجل العام</button>
             </div>
         </div>
 
         {/* === Tab Content === */}
         <div className="animate-fadeIn">
-            {/* 1. أدوات التحكم والفلاتر */}
+            {/* أدوات التحكم والفلاتر */}
             <div className="bg-gray-800 p-4 rounded-lg flex flex-col lg:flex-row gap-4 justify-between items-center shadow border border-gray-700 mb-6">
                 {activeTab === 'inventory' ? (
                    <>
@@ -190,12 +183,15 @@ export default function WarehouseManagement({ userRole }) {
                 <button onClick={refreshData} className="bg-gray-600 px-4 py-2 rounded hover:bg-gray-500 font-bold">🔄 تحديث</button>
             </div>
 
-            {/* 2. عرض الجداول */}
+            {/* عرض الجداول */}
             {loading ? <p className="text-center text-gray-400">جاري التحميل...</p> : (
-                activeTab === 'inventory' && !isSupervisorOnly ? (
+                activeTab === 'inventory' ? (
                     <InventoryTable 
                         products={filteredProducts} 
                         sizes={sizes} 
+                        // ✅ التعديل 4: تمرير خاصية showActions: إذا كان مشرف -> false (اخفاء)، غير ذلك -> true (إظهار)
+                        showActions={!isSupervisor}
+                        
                         onTransaction={(item, type) => setTransactionModal({ isOpen: true, item, type })}
                         onMaintenance={(item) => setMaintenanceModal({ isOpen: true, item })}
                         onHistory={(item) => setHistoryModal({ isOpen: true, item })}
@@ -208,7 +204,7 @@ export default function WarehouseManagement({ userRole }) {
 
         {/* === Modals === */}
         {/* لن نسمح بفتح نوافذ التعديل إذا كان المستخدم مشرفاً فقط */}
-        {!isSupervisorOnly && (
+        {!isSupervisor && (
             <>
                 <TransactionModal 
                     isOpen={transactionModal.isOpen} 
