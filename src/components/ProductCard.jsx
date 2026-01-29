@@ -1,80 +1,97 @@
-export default function ProductCard({ product, userRole, onDelete, onEdit }) {
+import React from 'react'; 
+
+function ProductCard({ product, userRole, onDelete, onEdit }) {
   
-  // دالة لتلوين الرصيد (أحمر، أصفر، أخضر)
+  // 1️⃣ تصحيح مصدر السعر: في النظام الجديد السعر اسمه selling_price
+  const price = product.selling_price || product.price || 0;
+  
+  // تحديد رمز العملة (افتراضياً دينار إذا لم يحدد)
+  const currencySymbol = product.currency === 'USD' ? '$' : 'د.ع';
+  
+  // تنسيق الرقم
+  const formattedPrice = Number(price).toLocaleString();
+
+  // 2️⃣ دالة لتلوين الرصيد (مهمة للمخزن)
   const getStockColor = (qty) => {
-    if (qty === 0) return 'text-red-500';
+    if (!qty || qty === 0) return 'text-red-500';
     if (qty <= 5) return 'text-yellow-500';
     return 'text-green-400';
   };
 
-  // ✅ تحديد الصلاحيات بوضوح
-  const showEditButton = userRole === 'admin' || userRole === 'supervisor'; // للمدير والمشرف
-  const showDeleteButton = userRole === 'admin'; // للمدير فقط
-
   return (
-    <div className="bg-gray-800 rounded-lg shadow-lg overflow-hidden border border-gray-700 hover:border-gray-500 transition relative group animate-fadeIn">
+    <div className="bg-gray-800 rounded-lg overflow-hidden shadow-lg border border-gray-700 flex flex-col hover:shadow-2xl transition-shadow duration-300 relative group animate-fadeIn">
       
-      {/* 1️⃣ أزرار التحكم (تظهر بناءً على الصلاحية) */}
-      <div className="absolute top-2 left-2 flex gap-2 z-10 opacity-0 group-hover:opacity-100 transition duration-300">
-          
-          {/* زر التعديل */}
-          {showEditButton && (
-            <button 
-                onClick={() => onEdit(product)} 
-                className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-full shadow-lg transition transform hover:scale-110" 
-                title="تعديل"
-            >
-                ✏️
-            </button>
-          )}
-
-          {/* زر الحذف */}
-          {showDeleteButton && (
-            <button 
-                onClick={() => onDelete(product.id, product.table)} 
-                className="bg-red-600 hover:bg-red-700 text-white p-2 rounded-full shadow-lg transition transform hover:scale-110" 
-                title="حذف"
-            >
-                🗑️
-            </button>
-          )}
-      </div>
-
       {/* صورة المنتج */}
-      <div className="h-48 overflow-hidden bg-gray-900 flex justify-center items-center relative">
-         {product.image_url ? (
-            <img src={product.image_url} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
-         ) : (
-            <span className="text-gray-600 text-4xl">🖼️</span>
-         )}
-         <div className="absolute bottom-0 w-full bg-black/60 p-1 text-center text-xs text-gray-300 backdrop-blur-sm">
-             {product.type}
+      <div className="relative h-48 w-full bg-gray-900 overflow-hidden">
+         <img 
+           src={product.image_url || "https://via.placeholder.com/300?text=No+Image"} 
+           alt={product.name} 
+           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+         />
+         <div className="absolute top-0 right-0 bg-blue-600 text-white text-xs font-bold px-2 py-1 m-2 rounded shadow">
+           {product.type || product.typeLabel}
          </div>
       </div>
 
       {/* تفاصيل المنتج */}
-      <div className="p-4 text-right">
-        <h3 className="text-lg font-bold text-white mb-2 truncate" title={product.name}>{product.name}</h3>
-        
-        {/* 2️⃣ عرض الرصيد: يظهر للجميع بلا استثناء */}
-        <div className="flex justify-between items-center mb-2 bg-gray-700/50 p-2 rounded">
-           <span className="text-sm text-gray-400">الرصيد:</span>
-           <span className={`font-bold ${getStockColor(product.stock_quantity)}`}>
-             {product.stock_quantity} قطعة
-           </span>
+      <div className="p-4 flex-grow flex flex-col justify-between">
+        <div>
+           <div className="flex justify-between items-start mb-2">
+              <h3 className="text-xl font-bold text-white leading-tight">{product.name || 'منتج بدون اسم'}</h3>
+           </div>
+           
+           {/* عرض السعر */}
+           <div className="text-2xl font-bold text-yellow-400 mb-2 flex items-center gap-1">
+              <span>{formattedPrice}</span>
+              <span className="text-sm text-yellow-600">{currencySymbol}</span>
+           </div>
+
+           {/* 🆕 عرض الرصيد (إضافة ضرورية للمخزن بنفس تصميمك) */}
+           <div className="mb-3 text-sm font-bold bg-gray-700/50 p-2 rounded flex justify-between">
+              <span className="text-gray-300">الرصيد المخزني:</span>
+              <span className={getStockColor(product.stock_quantity)}>
+                {product.stock_quantity || 0} قطعة
+              </span>
+           </div>
+           
+           {/* التفاصيل الإضافية (تظهر فقط إذا كانت البيانات موجودة) */}
+           <div className="space-y-1 text-sm text-gray-400 mb-4">
+              {/* هنا نعرض المقاس سواء كان مخزن كـ screen_size أو size_id */}
+              {(product.screen_size || product.size_id) && <p>📏 الحجم: <span className="text-gray-200">{product.screen_size || 'قياسي'}</span></p>}
+              
+              {product.ram && <p>💾 الذاكرة: <span className="text-gray-200">{product.ram}</span></p>}
+              {product.processor && <p>⚙️ المعالج: <span className="text-gray-200">{product.processor}</span></p>}
+              {product.storage && <p>💽 التخزين: <span className="text-gray-200">{product.storage}</span></p>}
+              {product.details && <p className="mt-2 text-xs border-t border-gray-700 pt-2">{product.details}</p>}
+           </div>
         </div>
 
-        {/* 3️⃣ عرض السعر: يظهر للجميع بلا استثناء (إذا كان موجوداً) */}
-        {product.selling_price ? (
-            <div className="text-xl font-bold text-green-400 mt-2 flex justify-between items-center border-t border-gray-700 pt-2">
-                <span className="text-sm text-gray-400">السعر:</span>
-                <span>{Number(product.selling_price).toLocaleString()} د.ع</span>
-            </div>
-        ) : (
-             // مسافة فارغة لحفظ التنسيق إذا لم يوجد سعر
-             <div className="mt-2 pt-2 border-t border-gray-700 text-xs text-gray-600">السعر غير محدد</div>
+        {/* أزرار التحكم - (نفس المنطق القديم الذي تريده) */}
+        {(userRole === 'admin' || userRole === 'supervisor') && (
+           <div className="flex gap-2 mt-4 pt-4 border-t border-gray-700">
+               
+               {/* زر التعديل: يظهر للمدير والمشرف */}
+               <button 
+                 onClick={() => onEdit(product)}
+                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded text-sm font-bold transition flex justify-center items-center gap-2"
+               >
+                 ✏️ تعديل
+               </button>
+               
+               {/* زر الحذف: يظهر للمدير فقط */}
+               {userRole === 'admin' && (
+                 <button 
+                   onClick={() => onDelete(product.id, product.table)}
+                   className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded text-sm font-bold transition flex justify-center items-center gap-2"
+                 >
+                   🗑️ حذف
+                 </button>
+               )}
+           </div>
         )}
       </div>
     </div>
-  );
+  )
 }
+
+export default ProductCard;
