@@ -30,13 +30,16 @@ function App() {
   const [availableYears, setAvailableYears] = useState([]);
   const [displayedProducts, setDisplayedProducts] = useState([]);
   
+  // ✅ 1. متغير جديد لحفظ المقاسات
+  const [sizes, setSizes] = useState([]); 
+  
   const [editingProduct, setEditingProduct] = useState(null);
   const [selectedBrandId, setSelectedBrandId] = useState("");
   const [selectedModelId, setSelectedModelId] = useState("");
   const [selectedYear, setSelectedYear] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // التحقق من المستخدم
+  // التحقق من المستخدم + جلب المقاسات
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -47,7 +50,16 @@ function App() {
       }
       setAuthLoading(false);
     };
+    
+    // ✅ 2. جلب المقاسات هنا
+    const fetchSizes = async () => {
+        const { data } = await supabase.from('standard_sizes').select('*');
+        if (data) setSizes(data);
+    };
+
     checkUser();
+    fetchSizes(); // استدعاء دالة جلب المقاسات
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (!session) setUserRole(null); else checkUser();
@@ -55,7 +67,14 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // جلب البيانات
+  // ... (بقية الـ useEffects للسيارات والمنتجات تبقى كما هي تماماً) ...
+  // حفاظاً على المساحة سأفترض أن بقية الكود (fetchBrands, fetchProductsByCar, etc.) موجودة هنا ولم تتغير.
+  
+  // --- (أعد نسخ دوال الجلب والحذف والتعديل من الكود السابق هنا) ---
+  // ...
+  // ...
+
+  // الجزء المهم للتعديل: useEffect الخاص بجلب الماركات
   useEffect(() => {
     if (session && userRole !== 'warehouse_worker' && userRole !== 'warehouse_supervisor') {
         const fetchBrands = async () => {
@@ -65,7 +84,7 @@ function App() {
         fetchBrands();
     }
   }, [session, userRole, showMasterDataPanel]);
-
+  
   useEffect(() => {
     if (!selectedBrandId) return;
     const fetchModels = async () => {
@@ -118,30 +137,23 @@ function App() {
     };
     fetchProductsByCar();
   }, [selectedYear, selectedModelId]);
-
+  
   const handleDeleteProduct = async (productId, tableName) => {
-    // 🔒 حماية إضافية: فقط المدير يحذف
-    if (userRole !== 'admin') {
-        alert("⛔ غير مسموح لك بالحذف");
-        return;
-    }
-    if (!window.confirm("هل أنت متأكد أنك تريد حذف هذا المنتج نهائياً؟")) return;
+    if (userRole !== 'admin') { return alert("⛔ غير مسموح"); }
+    if (!window.confirm("حذف نهائي؟")) return;
     const { error } = await supabase.from(tableName).delete().eq('id', productId);
-    if (error) { alert("حدث خطأ: " + error.message); } 
-    else {
-        setDisplayedProducts(prev => prev.filter(item => item.id !== productId || item.table !== tableName));
-        alert("تم الحذف بنجاح 🗑️");
-    }
+    if (error) { alert(error.message); } 
+    else { setDisplayedProducts(prev => prev.filter(item => item.id !== productId || item.table !== tableName)); alert("تم الحذف 🗑️"); }
   };
 
   const handleProductUpdate = (updatedProduct) => {
     setDisplayedProducts(prevProducts => prevProducts.map(p => (p.id === updatedProduct.id && p.table === updatedProduct.table) ? updatedProduct : p));
   };
-
+  
   const handleBrandChange = (e) => { setSelectedBrandId(e.target.value); setModels([]); setSelectedModelId(""); setAvailableYears([]); setSelectedYear(""); setDisplayedProducts([]); };
   const handleModelChange = (e) => { setSelectedModelId(e.target.value); setAvailableYears([]); setSelectedYear(""); setDisplayedProducts([]); };
   const handleLogout = async () => { await supabase.auth.signOut(); };
-  
+
   const togglePanel = (panelName) => {
       setShowAdminPanel(panelName === 'admin' ? !showAdminPanel : false);
       setShowUserPanel(panelName === 'users' ? !showUserPanel : false);
@@ -153,7 +165,6 @@ function App() {
   if (authLoading) return <div className="min-h-screen bg-gray-900 flex justify-center items-center text-white">جاري التحقق... 🔐</div>;
   if (!session) return (<div className="bg-gray-900 min-h-screen flex flex-col justify-center items-center p-4"><h1 className="text-4xl font-bold text-yellow-500 mb-2">نظام إدارة المخزون 🚗</h1><div className="w-full max-w-md bg-gray-800 p-1 rounded-lg shadow-2xl"><Login onClose={() => {}} /></div></div>);
 
-  // واجهة موظف ومشرف المخزن (الواجهة الخاصة)
   if (userRole === 'warehouse_worker' || userRole === 'warehouse_supervisor') {
       return (
           <div className="min-h-screen bg-gray-900 dir-rtl text-right">
@@ -166,11 +177,9 @@ function App() {
       );
   }
 
-  // التطبيق الرئيسي (المدير والمشرف العام)
   return (
     <div className="bg-gray-900 min-h-screen text-white font-sans flex flex-col dir-rtl">
       <Header />
-      
       <div className="bg-gray-800 border-b border-gray-700 p-3 flex justify-between items-center px-6 shadow-md">
          <div className="flex items-center gap-3">
             <div className={`w-3 h-3 rounded-full ${userRole === 'admin' ? 'bg-red-500' : userRole === 'supervisor' ? 'bg-yellow-500' : 'bg-green-500'}`}></div>
@@ -181,66 +190,20 @@ function App() {
 
       {(userRole === 'admin' || userRole === 'supervisor') && (
         <div className="container mx-auto p-4 mt-4 grid grid-cols-2 md:grid-cols-5 gap-3">
-            
-            {/* زر إضافة منتجات (للجميع) */}
-            <button 
-                onClick={() => togglePanel('admin')} 
-                className={`p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${showAdminPanel ? 'bg-blue-800 border-blue-500 ring-2 ring-blue-400' : 'bg-blue-900 border-blue-800 hover:bg-blue-800'}`}
-            >
-                <span className="text-2xl">📦</span>
-                <span>إضافة منتجات</span>
-            </button>
-            
-            {/* زر الكتالوج (للجميع) */}
-            <button 
-                onClick={() => togglePanel('catalog')} 
-                className={`p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${showCatalogPanel ? 'bg-cyan-800 border-cyan-500 ring-2 ring-cyan-400' : 'bg-cyan-900 border-cyan-800 hover:bg-cyan-800'}`}
-            >
-                <span className="text-2xl">📋</span>
-                <span>الكتالوج</span>
-            </button>
-            
-            {/* 🔒 زر المخزن (حصري للمدير فقط) - تم إزالة supervisor من الشرط */}
-            {userRole === 'admin' && (
-                <button 
-                    onClick={() => togglePanel('warehouse')} 
-                    className={`p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${showWarehousePanel ? 'bg-orange-800 border-orange-500 ring-2 ring-orange-400' : 'bg-orange-900 border-orange-800 hover:bg-orange-800'}`}
-                >
-                    <span className="text-2xl">🏭</span>
-                    <span>المخزن</span>
-                </button>
-            )}
-            
-            {/* 🔒 زر السيارات (حصري للمدير) */}
-            {userRole === 'admin' && (
-                <button 
-                    onClick={() => togglePanel('master')} 
-                    className={`p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${showMasterDataPanel ? 'bg-green-800 border-green-500 ring-2 ring-green-400' : 'bg-green-900 border-green-800 hover:bg-green-800'}`}
-                >
-                    <span className="text-2xl">🚗</span>
-                    <span>السيارات</span>
-                </button>
-            )}
-
-            {/* 🔒 زر الموظفين (حصري للمدير) */}
-            {userRole === 'admin' && (
-                <button 
-                    onClick={() => togglePanel('users')} 
-                    className={`col-span-2 md:col-span-1 p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${showUserPanel ? 'bg-purple-800 border-purple-500 ring-2 ring-purple-400' : 'bg-purple-900 border-purple-800 hover:bg-purple-800'}`}
-                >
-                    <span className="text-2xl">👥</span>
-                    <span>الموظفين</span>
-                </button>
-            )}
+            <button onClick={() => togglePanel('admin')} className={`p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${showAdminPanel ? 'bg-blue-800 border-blue-500 ring-2 ring-blue-400' : 'bg-blue-900 border-blue-800 hover:bg-blue-800'}`}><span className="text-2xl">📦</span><span>إضافة منتجات</span></button>
+            <button onClick={() => togglePanel('catalog')} className={`p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${showCatalogPanel ? 'bg-cyan-800 border-cyan-500 ring-2 ring-cyan-400' : 'bg-cyan-900 border-cyan-800 hover:bg-cyan-800'}`}><span className="text-2xl">📋</span><span>الكتالوج</span></button>
+            {userRole === 'admin' && (<button onClick={() => togglePanel('warehouse')} className={`p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${showWarehousePanel ? 'bg-orange-800 border-orange-500 ring-2 ring-orange-400' : 'bg-orange-900 border-orange-800 hover:bg-orange-800'}`}><span className="text-2xl">🏭</span><span>المخزن</span></button>)}
+            {userRole === 'admin' && (<button onClick={() => togglePanel('master')} className={`p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${showMasterDataPanel ? 'bg-green-800 border-green-500 ring-2 ring-green-400' : 'bg-green-900 border-green-800 hover:bg-green-800'}`}><span className="text-2xl">🚗</span><span>السيارات</span></button>)}
+            {userRole === 'admin' && (<button onClick={() => togglePanel('users')} className={`col-span-2 md:col-span-1 p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${showUserPanel ? 'bg-purple-800 border-purple-500 ring-2 ring-purple-400' : 'bg-purple-900 border-purple-800 hover:bg-purple-800'}`}><span className="text-2xl">👥</span><span>الموظفين</span></button>)}
         </div>
       )}
 
       {showAdminPanel && <div className="container mx-auto px-4 md:px-8 mb-8 border-b border-gray-700 pb-8 animate-fadeIn"><AddProductForm /></div>}
-      {showCatalogPanel && <div className="container mx-auto px-4 md:px-8 mb-8 border-b border-gray-700 pb-8 animate-fadeIn"><ProductCatalog userRole={userRole} /></div>}
       
-      {/* عرض لوحة المخزن للمدير فقط */}
+      {/* ✅ 3. تمرير sizes للكتالوج */}
+      {showCatalogPanel && <div className="container mx-auto px-4 md:px-8 mb-8 border-b border-gray-700 pb-8 animate-fadeIn"><ProductCatalog userRole={userRole} sizes={sizes} /></div>}
+      
       {showWarehousePanel && userRole === 'admin' && <div className="container mx-auto px-2 mb-8 border-b border-gray-700 pb-8 animate-fadeIn"><WarehouseManagement userRole={userRole} /></div>}
-      
       {showMasterDataPanel && <div className="container mx-auto px-4 md:px-8 mb-8 border-b border-gray-700 pb-8 animate-fadeIn"><MasterDataManagement /></div>}
       {showUserPanel && <div className="container mx-auto px-4 md:px-8 mb-8 border-b border-gray-700 pb-8 animate-fadeIn"><UserManagement /></div>}
 
@@ -257,7 +220,17 @@ function App() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {loading ? (<p className="text-center text-white col-span-3">جاري البحث... ⏳</p>) : displayedProducts.length > 0 ? (displayedProducts.map((product) => (<ProductCard key={`${product.table}-${product.id}`} product={product} userRole={userRole} onDelete={handleDeleteProduct} onEdit={setEditingProduct} />))) : (
+                  {loading ? (<p className="text-center text-white col-span-3">جاري البحث... ⏳</p>) : displayedProducts.length > 0 ? (displayedProducts.map((product) => (
+                    // ✅ 4. تمرير sizes لبطاقة المنتج في الصفحة الرئيسية
+                    <ProductCard 
+                        key={`${product.table}-${product.id}`} 
+                        product={product} 
+                        userRole={userRole} 
+                        sizes={sizes}
+                        onDelete={handleDeleteProduct} 
+                        onEdit={setEditingProduct} 
+                    />
+                  ))) : (
                     <div className="col-span-3 text-center text-gray-500 mt-10">
                         {selectedYear ? "لا توجد منتجات مطابقة لهذا الموديل" : "الرجاء اختيار سيارة لعرض المنتجات"}
                     </div>

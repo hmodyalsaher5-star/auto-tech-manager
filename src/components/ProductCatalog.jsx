@@ -3,9 +3,12 @@ import { supabase } from '../supabase';
 import ProductCard from './ProductCard';
 import EditProductModal from './EditProductModal';
 
-export default function ProductCatalog({ userRole }) {
+// يمكننا استقبال sizes كـ prop من الأب، أو استخدام الـ state الداخلي كما هو موجود في كودك الحالي
+export default function ProductCatalog({ userRole, sizes: propSizes }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
+  
+  // نستخدم المقاسات الممررة من App أو نجلبها داخلياً (حسب كودك الحالي سنعتمد على الجلب الداخلي أو الدمج)
   const [sizes, setSizes] = useState([]);
 
   // --- الفلاتر ---
@@ -16,14 +19,19 @@ export default function ProductCatalog({ userRole }) {
   // --- التعديل ---
   const [editingProduct, setEditingProduct] = useState(null);
 
-  // 1. جلب المقاسات للفلاتر
+  // 1. جلب المقاسات (موجود في كودك، سنبقيه لضمان العمل)
   useEffect(() => {
     const fetchSizes = async () => {
-      const { data } = await supabase.from('standard_sizes').select('*');
-      if (data) setSizes(data);
+      // إذا تم تمرير المقاسات من App نستخدمها، وإلا نجلبها من السيرفر
+      if (propSizes && propSizes.length > 0) {
+          setSizes(propSizes);
+      } else {
+          const { data } = await supabase.from('standard_sizes').select('*');
+          if (data) setSizes(data);
+      }
     };
     fetchSizes();
-  }, []);
+  }, [propSizes]);
 
   // 2. جلب المنتجات (عند تغيير أي فلتر)
   useEffect(() => {
@@ -31,24 +39,19 @@ export default function ProductCatalog({ userRole }) {
       setLoading(true);
       
       try {
-        // تجهيز استعلام الإطارات
         let framesQuery = supabase.from('frames').select('*');
-        // تجهيز استعلام الشاشات
         let screensQuery = supabase.from('screens').select('*');
 
-        // تطبيق فلتر المقاس (إذا تم اختياره)
         if (filterSize !== 'all') {
           framesQuery = framesQuery.eq('size_id', filterSize);
           screensQuery = screensQuery.eq('size_id', filterSize);
         }
 
-        // تطبيق البحث بالاسم (إذا وجد نص)
         if (searchTerm) {
           framesQuery = framesQuery.ilike('name', `%${searchTerm}%`);
           screensQuery = screensQuery.ilike('name', `%${searchTerm}%`);
         }
 
-        // تنفيذ الاستعلامات بناءً على نوع الفلتر
         let fetchedFrames = [];
         let fetchedScreens = [];
 
@@ -62,10 +65,7 @@ export default function ProductCatalog({ userRole }) {
           if (res.data) fetchedScreens = res.data.map(s => ({ ...s, type: 'شاشة إلكترونية 📺', table: 'screens' }));
         }
 
-        // دمج النتائج
         const combined = [...fetchedFrames, ...fetchedScreens];
-        
-        // ترتيب النتائج (الأحدث أولاً)
         combined.sort((a, b) => b.id - a.id);
 
         setProducts(combined);
@@ -77,7 +77,6 @@ export default function ProductCatalog({ userRole }) {
       setLoading(false);
     };
 
-    // نستخدم Timeout بسيط لمنع التكرار السريع عند الكتابة
     const delayDebounce = setTimeout(() => {
       fetchProducts();
     }, 300);
@@ -168,6 +167,10 @@ export default function ProductCatalog({ userRole }) {
                 key={`${product.table}-${product.id}`}
                 product={product}
                 userRole={userRole}
+                
+                // ✅✅✅ تم التعديل هنا: تمرير المقاسات للبطاقة ✅✅✅
+                sizes={sizes}
+                
                 onDelete={handleDelete}
                 onEdit={setEditingProduct}
              />
