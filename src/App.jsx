@@ -107,7 +107,7 @@ function App() {
     fetchYears();
   }, [selectedModelId]);
 
-  useEffect(() => {
+ /* useEffect(() => {
     if (!selectedYear || !selectedModelId) return;
     const fetchProductsByCar = async () => {
       setLoading(true);
@@ -135,6 +135,44 @@ function App() {
       } catch (error) { console.error(error); }
       setLoading(false);
     };
+    fetchProductsByCar();
+  }, [selectedYear, selectedModelId]); */
+  // منطق البحث بالسيارة (تم التعديل: فك الارتباط بين الإطار والشاشات العامة)
+  useEffect(() => {
+    if (!selectedYear || !selectedModelId) return;
+
+    const fetchProductsByCar = async () => {
+      setLoading(true);
+      try {
+        const { data: genData } = await supabase.from('car_generations').select('id').eq('car_model_id', selectedModelId).lte('start_year', selectedYear).gte('end_year', selectedYear).single();
+        
+        if (genData) {
+          const generationId = genData.id;
+          
+          // 1. جلب الإطارات (يظهر الإطارات الخاصة بهذه السيارة)
+          const { data: frames } = await supabase.from('frames').select('*').eq('generation_id', generationId);
+
+          // 2. جلب الشاشات (تعديل: نجلب فقط الشاشات السبشل المربوطة بهذه السيارة)
+          // تم إزالة المنطق الذي كان يجلب الشاشات العامة بناءً على مقاس الإطار
+          const { data: screens } = await supabase
+              .from('screens')
+              .select('*')
+              .eq('generation_id', generationId);
+
+          const allItems = [
+            ...(frames || []).map(f => ({ ...f, type: 'إطار/ديكور 🖼️', table: 'frames' })),
+            ...(screens || []).map(s => ({ ...s, type: 'شاشة إلكترونية 📺', table: 'screens' }))
+          ];
+          
+          setDisplayedProducts(allItems);
+
+        } else {
+          setDisplayedProducts([]);
+        }
+      } catch (error) { console.error(error); }
+      setLoading(false);
+    };
+
     fetchProductsByCar();
   }, [selectedYear, selectedModelId]);
   
