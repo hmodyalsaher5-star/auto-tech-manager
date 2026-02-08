@@ -15,7 +15,7 @@ export default function UserManagement() {
     else setUsers(data);
   };
 
-  // ✅ الإصلاح: التحميل الأولي داخل useEffect بشكل منفصل لمنع التكرار
+  // التحميل الأولي
   useEffect(() => {
     let isMounted = true;
     const initFetch = async () => {
@@ -56,7 +56,7 @@ export default function UserManagement() {
         alert("✅ تم إضافة الموظف بنجاح!");
         setNewUserEmail('');
         setNewUserPassword('');
-        fetchUsersManual(); // تحديث القائمة يدوياً هنا
+        fetchUsersManual(); // تحديث القائمة
       }
     }
     setLoading(false);
@@ -83,13 +83,18 @@ export default function UserManagement() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <input type="email" required placeholder="البريد الإلكتروني" value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} className="p-2 rounded bg-gray-800 border border-gray-600 text-white" />
           <input type="password" required placeholder="كلمة المرور" value={newUserPassword} onChange={e => setNewUserPassword(e.target.value)} className="p-2 rounded bg-gray-800 border border-gray-600 text-white" />
+          
+          {/* ✅ قائمة اختيار الصلاحية عند الإضافة */}
           <select value={newUserRole} onChange={e => setNewUserRole(e.target.value)} className="p-2 rounded bg-gray-800 border border-gray-600 text-white font-bold">
             <option value="admin">🔴 مدير عام</option>
             <option value="supervisor">🟡 مشرف عام</option>
-            <option value="viewer">🟢 زائر</option>
-            <option value="warehouse_worker">📦 موظف مخزن</option>
+            <option value="sales">🛒 مبيعات</option>
+            <option value="accountant">🧮 محاسب</option>
             <option value="warehouse_supervisor">📋 مشرف مخزن</option>
+            <option value="warehouse_worker">📦 موظف مخزن</option>
+            <option value="viewer">🟢 زائر</option>
           </select>
+
           <button disabled={loading} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded">{loading ? "جاري..." : "إضافة +"}</button>
         </div>
       </form>
@@ -105,9 +110,15 @@ export default function UserManagement() {
                 <td className="p-3 text-gray-200">{user.email}</td>
                 <td className="p-3"><span className="px-2 py-1 rounded text-xs font-bold bg-blue-900 text-blue-200">{user.role}</span></td>
                 <td className="p-3">
+                   {/* ✅ قائمة تعديل الصلاحية في الجدول */}
                    <select value={user.role} onChange={(e) => handleUpdateRole(user.id, e.target.value)} className="bg-gray-800 border border-gray-600 text-white text-sm p-1 rounded">
-                        <option value="admin">مدير</option><option value="supervisor">مشرف</option><option value="viewer">زائر</option>
-                        <option value="warehouse_worker">موظف مخزن</option><option value="warehouse_supervisor">مشرف مخزن</option>
+                        <option value="admin">مدير</option>
+                        <option value="supervisor">مشرف</option>
+                        <option value="sales">مبيعات</option>
+                        <option value="accountant">محاسب</option>
+                        <option value="warehouse_supervisor">مشرف مخزن</option>
+                        <option value="warehouse_worker">موظف مخزن</option>
+                        <option value="viewer">زائر</option>
                    </select>
                 </td>
                 <td className="p-3"><button onClick={() => handleDeleteUser(user.id)} className="text-red-400 font-bold">&times;</button></td>
