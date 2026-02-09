@@ -96,11 +96,16 @@ function App() {
   };
 
   // دوال التنقل
+// ✅ التنقل داخل الحسابات
   const handleAccountNavigation = (target) => {
       setShowAccountsDashboard(false);
+      
       if (target === 'payout') setShowTechnicianPayout(true);
       if (target === 'dailyReport') setShowDailyReport(true);
       if (target === 'review') setShowAdminReview(true);
+      
+      // 👇 هذا السطر ضروري جداً لكي يعمل زر الكاشير الجديد 👇
+      if (target === 'cashier') setShowCashierPanel(true); 
   };
 
   const handleBackToAccounts = () => {
@@ -141,13 +146,28 @@ function App() {
               {/* 🕹️ شريط الأزرار */}
               <div className="container mx-auto p-4 mt-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
                 
-                {/* 👑 أزرار المدير */}
+            {/* 👑 أزرار المدير */}
                 {userRole === 'admin' && (
                     <>
-                        <button onClick={() => togglePanel('accounts')} className={`p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${showAccountsDashboard ? 'bg-yellow-700 border-yellow-500 ring-2 ring-yellow-400' : 'bg-yellow-800 border-yellow-700 hover:bg-yellow-700'}`}><span className="text-2xl">💰</span><span>الحسابات</span></button>
-                        <button onClick={() => togglePanel('users')} className={`p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${showUserPanel ? 'bg-indigo-800 border-indigo-500 ring-2 ring-indigo-400' : 'bg-indigo-900 border-indigo-800 hover:bg-indigo-800'}`}><span className="text-2xl">👥</span><span>الموظفين</span></button>
-                        <button onClick={() => togglePanel('admin')} className={`p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${showAdminPanel ? 'bg-blue-800 border-blue-500 ring-2 ring-blue-400' : 'bg-blue-900 border-blue-800 hover:bg-blue-800'}`}><span className="text-2xl">📦</span><span>إضافة منتج</span></button>
-                        <button onClick={() => togglePanel('master')} className={`p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${showMasterDataPanel ? 'bg-emerald-800 border-emerald-500 ring-2 ring-emerald-400' : 'bg-emerald-900 border-emerald-800 hover:bg-emerald-800'}`}><span className="text-2xl">🚗</span><span>السيارات</span></button>
+                        <button onClick={() => togglePanel('accounts')} className={`p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${showAccountsDashboard ? 'bg-yellow-700 border-yellow-500 ring-2 ring-yellow-400' : 'bg-yellow-800 border-yellow-700 hover:bg-yellow-700'}`}>
+                            <span className="text-2xl">💰</span><span>الحسابات</span>
+                        </button>
+                        
+                        <button onClick={() => togglePanel('users')} className={`p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${showUserPanel ? 'bg-indigo-800 border-indigo-500 ring-2 ring-indigo-400' : 'bg-indigo-900 border-indigo-800 hover:bg-indigo-800'}`}>
+                            <span className="text-2xl">👥</span><span>الموظفين</span>
+                        </button>
+
+                        <button onClick={() => togglePanel('admin')} className={`p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${showAdminPanel ? 'bg-blue-800 border-blue-500 ring-2 ring-blue-400' : 'bg-blue-900 border-blue-800 hover:bg-blue-800'}`}>
+                            <span className="text-2xl">📦</span><span>إضافة منتج</span>
+                        </button>
+
+                        <button onClick={() => togglePanel('warehouse')} className={`p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${showWarehousePanel ? 'bg-orange-800 border-orange-500 ring-2 ring-orange-400' : 'bg-orange-900 border-orange-800 hover:bg-orange-800'}`}>
+                            <span className="text-2xl">🏭</span><span>المخزن</span>
+                        </button>
+
+                        <button onClick={() => togglePanel('master')} className={`p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${showMasterDataPanel ? 'bg-emerald-800 border-emerald-500 ring-2 ring-emerald-400' : 'bg-emerald-900 border-emerald-800 hover:bg-emerald-800'}`}>
+                            <span className="text-2xl">🚗</span><span>السيارات</span>
+                        </button>
                     </>
                 )}
 

@@ -2,28 +2,24 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../supabase';
 
 export default function AdminReview() {
-  // --- States ---
   const [salesToReview, setSalesToReview] = useState([]); 
   const [technicians, setTechnicians] = useState([]); 
   const [section1Data, setSection1Data] = useState([]); 
   const [section2Data, setSection2Data] = useState([]); 
   const [loading, setLoading] = useState(false); 
   
-  // إدارة التعيينات المؤقتة
   const [tempAssignments, setTempAssignments] = useState({});
   const [selectedForTransfer, setSelectedForTransfer] = useState([]);
 
-  // النوافذ المنبثقة
   const [isModalOpen, setIsModalOpen] = useState(false); 
   const [currentSaleId, setCurrentSaleId] = useState(null);
   const [modalTechId, setModalTechId] = useState('');
 
-  // نافذة إضافة الحافز
   const [isExtraModalOpen, setIsExtraModalOpen] = useState(false);
   const [extraTarget, setExtraTarget] = useState(null); 
   const [extraAmount, setExtraAmount] = useState('');
 
-  // ✅ جلب البيانات
+  // جلب البيانات
   useEffect(() => {
     let isMounted = true; 
     const fetchData = async () => {
@@ -62,41 +58,59 @@ export default function AdminReview() {
     }
   };
 
-  // --- إضافة حافز (القسم السفلي) ---
-  const openExtraModal = (item) => {
-    setExtraTarget(item); 
-    setExtraAmount(''); 
-    setIsExtraModalOpen(true);
+  // ✅ دالة حذف السجل من المراجعة (Inbox)
+  const handleDeleteSale = async (saleId) => {
+      if (!window.confirm("هل أنت متأكد من حذف هذا السجل نهائياً؟ (سيتم إلغاء عملية البيع)")) return;
+      
+      const { error } = await supabase.from('sales_operations').delete().eq('id', saleId);
+      
+      if (error) alert("❌ خطأ أثناء الحذف: " + error.message);
+      else {
+          alert("🗑️ تم الحذف بنجاح");
+          setSalesToReview(prev => prev.filter(s => s.id !== saleId)); 
+      }
   };
 
-  const submitExtraFromSection1 = async () => {
-    if (!extraAmount || Number(extraAmount) <= 0) return alert("الرجاء إدخال مبلغ صحيح");
-    // نأخذ ID واحد من المجموعة للتحديث (لأننا نعدل السجل لترحيله للقسم الثاني)
-    // ملاحظة: لو كانت السيارة مكررة كسجلات، سنحدث الأول فقط لضمان عدم تضاعف المبالغ
-    const targetId = extraTarget.ids[0]; 
-    const newTotal = 5000 + Number(extraAmount);
+  // ✅ دالة حذف الحافز من القسمين الأول والثاني (إلغاء الترحيل)
+  const handleDeleteIncentive = async (ids, saleId) => {
+    if (!window.confirm("هل تريد حذف هذا الحافز وإعادة الطلب للقائمة العلوية؟")) return;
 
-    const { error } = await supabase.from('technician_incentives')
-        .update({ additional_amount: Number(extraAmount), amount: newTotal })
-        .eq('id', targetId);
+    // 1. حذف الحوافز المسجلة
+    const { error: deleteError } = await supabase
+        .from('technician_incentives')
+        .delete()
+        .in('id', ids);
 
-    if (error) alert("خطأ: " + error.message);
+    if (deleteError) return alert("❌ خطأ في الحذف: " + deleteError.message);
+
+    // 2. إعادة حالة الطلب إلى confirmed ليعود للجدول العلوي
+    const { error: updateError } = await supabase
+        .from('sales_operations')
+        .update({ status: 'confirmed' })
+        .eq('id', saleId);
+
+    if (updateError) alert("⚠️ تم الحذف لكن فشل تحديث حالة الطلب");
     else {
-        alert("✅ تم الترحيل");
-        setIsExtraModalOpen(false);
+        alert("✅ تم الحذف وإعادة الطلب للمراجعة");
         refreshData();
     }
   };
 
-  // --- إدارة الفنيين (القسم العلوي) ---
+  // --- بقية الدوال ---
+  const openExtraModal = (item) => { setExtraTarget(item); setExtraAmount(''); setIsExtraModalOpen(true); };
+  const submitExtraFromSection1 = async () => {
+    if (!extraAmount || Number(extraAmount) <= 0) return alert("الرجاء إدخال مبلغ صحيح");
+    const targetId = extraTarget.ids[0]; 
+    const newTotal = 5000 + Number(extraAmount);
+    const { error } = await supabase.from('technician_incentives').update({ additional_amount: Number(extraAmount), amount: newTotal }).eq('id', targetId);
+    if (error) alert("خطأ: " + error.message);
+    else { alert("✅ تم الترحيل"); setIsExtraModalOpen(false); refreshData(); }
+  };
+
   const openTechModal = (saleId) => {
     setCurrentSaleId(saleId); setModalTechId(''); setIsModalOpen(true);
-    // تهيئة السجل إذا لم يكن موجوداً
     if (!tempAssignments[saleId]) {
-        setTempAssignments(prev => ({ 
-            ...prev, 
-            [saleId]: { techs: [], notes: '', is_standard: true, additional_amount: 0 } 
-        }));
+        setTempAssignments(prev => ({ ...prev, [saleId]: { techs: [], notes: '', is_standard: true, additional_amount: 0 } }));
     }
   };
 
@@ -105,32 +119,20 @@ export default function AdminReview() {
     const techObj = technicians.find(t => t.id === modalTechId);
     setTempAssignments(prev => {
         const current = prev[currentSaleId];
-        // منع التكرار في القائمة المؤقتة
         if (current.techs.find(t => t.id === modalTechId)) return prev;
-        return { 
-            ...prev, 
-            [currentSaleId]: { ...current, techs: [...current.techs, { id: techObj.id, name: techObj.name }] } 
-        };
+        return { ...prev, [currentSaleId]: { ...current, techs: [...current.techs, { id: techObj.id, name: techObj.name }] } };
     });
     setModalTechId('');
   };
 
   const removeTechFromRow = (saleId, techId) => {
-      setTempAssignments(prev => ({ 
-          ...prev, 
-          [saleId]: { ...prev[saleId], techs: prev[saleId].techs.filter(t => t.id !== techId) } 
-      }));
+      setTempAssignments(prev => ({ ...prev, [saleId]: { ...prev[saleId], techs: prev[saleId].techs.filter(t => t.id !== techId) } }));
   };
 
-  // 🔥🔥🔥 هنا كان الخطأ وتم إصلاحه 🔥🔥🔥
   const updateAssignmentField = (saleId, field, value) => {
     setTempAssignments(prev => {
-        // التأكد من وجود كائن كامل للصف قبل التحديث
         const current = prev[saleId] || { techs: [], notes: '', is_standard: true, additional_amount: 0 };
-        return {
-            ...prev,
-            [saleId]: { ...current, [field]: value }
-        };
+        return { ...prev, [saleId]: { ...current, [field]: value } };
     });
   };
   
@@ -148,19 +150,15 @@ export default function AdminReview() {
 
     selectedForTransfer.forEach(saleId => {
         const assignment = tempAssignments[saleId];
-        
         if (assignment && assignment.techs.length > 0) {
             const standardVal = assignment.is_standard ? 5000 : 0;
             const additionalVal = Number(assignment.additional_amount) || 0;
             const totalForCar = standardVal + additionalVal;
-
             if (totalForCar === 0) return;
 
-            // دمج أسماء الفنيين في سجل واحد
             const combinedTechNames = assignment.techs.map(t => t.name).join(' & ');
-            const primaryTechId = assignment.techs[0].id; // نحتاج ID لربط السجل (اختياري)
+            const primaryTechId = assignment.techs[0].id;
 
-            // إرسال سجل واحد فقط للعملية (لمنع تكرار المبالغ)
             incentivesPayload.push({
                 sale_id: saleId,
                 technician_id: primaryTechId,
@@ -170,16 +168,13 @@ export default function AdminReview() {
                 amount: totalForCar,
                 notes: assignment.notes
             });
-
             salesToUpdate.push(saleId);
         }
     });
 
     if (incentivesPayload.length === 0) return alert("❌ تأكد من تحديد البيانات!");
-
     const { error: insertError } = await supabase.from('technician_incentives').insert(incentivesPayload);
     if (insertError) return alert("خطأ: " + insertError.message);
-
     await supabase.from('sales_operations').update({ status: 'reviewed' }).in('id', salesToUpdate);
     alert("✅ تم الترحيل بنجاح"); 
     setTempAssignments({}); 
@@ -187,7 +182,6 @@ export default function AdminReview() {
     refreshData(); 
   };
 
-  // --- تجميع البيانات للعرض (Grouping) ---
   const groupIncentives = (items) => {
     const grouped = items.reduce((acc, item) => {
         if (!acc[item.sale_id]) {
@@ -203,11 +197,8 @@ export default function AdminReview() {
 
   const groupedSection1 = groupIncentives(section1Data);
   const groupedSection2 = groupIncentives(section2Data);
-
-  // الحسابات (بناءً على السيارات)
   const totalSection1Count = groupedSection1.length; 
   const totalStandardAmount = totalSection1Count * 5000;
-  // للقسم الثاني نجمع من القائمة المجمعة لضمان عدم التكرار
   const totalAdditionalSum = groupedSection2.reduce((sum, item) => sum + Number(item.additional_amount), 0);
   const grandTotal = totalStandardAmount + totalAdditionalSum;
 
@@ -216,7 +207,7 @@ export default function AdminReview() {
   return (
     <div className="p-4 dir-rtl text-right space-y-8 animate-fadeIn max-w-[95%] mx-auto">
       
-      {/* 🔴 Inbox */}
+      {/* 🔴 Inbox - المبيعات الواردة */}
       <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 shadow-xl">
         <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold text-yellow-400">📥 مبيعات بانتظار التحديد ({salesToReview.length})</h2>
@@ -231,8 +222,9 @@ export default function AdminReview() {
                         <th className="p-3 text-right border border-gray-700 w-1/4">المنتج والسيارة</th>
                         <th className="p-3 text-right border border-gray-700 w-1/4">الفنيين</th>
                         <th className="p-3 text-center border border-gray-700 w-24">شامل 5000؟</th>
-                        <th className="p-3 text-right border border-gray-700 w-32">مبلغ إضافي/يدوي</th>
+                        <th className="p-3 text-right border border-gray-700 w-32">مبلغ إضافي</th>
                         <th className="p-3 text-right border border-gray-700">ملاحظات</th>
+                        <th className="p-3 text-center border border-gray-700 w-12">حذف</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -246,7 +238,6 @@ export default function AdminReview() {
                                 <td className="p-3 border border-gray-700"><div className="font-bold text-white text-base">{sale.car_type}</div><div className="text-gray-400">{sale.details}</div><div className="text-xs text-yellow-500 mt-1 font-mono">الأصلي: {Number(sale.amount_total).toLocaleString()}</div></td>
                                 <td className="p-3 border border-gray-700">
                                     <div className="flex flex-wrap gap-2 mb-2">
-                                        {/* هنا سبب الشاشة البيضاء سابقاً: techs كانت undefined */}
                                         {assigned.techs && assigned.techs.map(t => (
                                             <span key={t.id} className="bg-blue-600 text-white px-2 py-1 rounded-full text-xs flex items-center gap-1">
                                                 {t.name}<button onClick={() => removeTechFromRow(sale.id, t.id)} className="hover:text-red-300 font-bold">×</button>
@@ -258,10 +249,19 @@ export default function AdminReview() {
                                 <td className="p-3 border border-gray-700 text-center bg-blue-900/10"><input type="checkbox" className="w-5 h-5 rounded cursor-pointer accent-blue-500" checked={assigned.is_standard} onChange={(e) => updateAssignmentField(sale.id, 'is_standard', e.target.checked)} /></td>
                                 <td className="p-3 border border-gray-700 bg-purple-900/10"><input type="number" className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white focus:border-purple-500 outline-none text-center font-bold text-purple-300" placeholder="0" value={assigned.additional_amount} onChange={(e) => updateAssignmentField(sale.id, 'additional_amount', e.target.value)} /></td>
                                 <td className="p-3 border border-gray-700"><input type="text" className="w-full bg-transparent border-b border-gray-600 focus:border-blue-500 outline-none text-white text-sm" placeholder="ملاحظة..." value={assigned.notes} onChange={(e) => updateAssignmentField(sale.id, 'notes', e.target.value)} /></td>
+                                <td className="p-3 border border-gray-700 text-center">
+                                    <button 
+                                        onClick={() => handleDeleteSale(sale.id)} 
+                                        className="text-red-500 hover:text-red-400 font-bold text-xl transition transform hover:scale-110"
+                                        title="حذف السجل"
+                                    >
+                                        &times;
+                                    </button>
+                                </td>
                             </tr>
                         );
                     })}
-                    {salesToReview.length === 0 && <tr><td colSpan="7" className="p-6 text-center text-gray-500">لا توجد مبيعات بانتظار المراجعة</td></tr>}
+                    {salesToReview.length === 0 && <tr><td colSpan="8" className="p-6 text-center text-gray-500">لا توجد مبيعات بانتظار المراجعة</td></tr>}
                 </tbody>
             </table>
         </div>
@@ -280,6 +280,8 @@ export default function AdminReview() {
                         <th className="p-2 text-right border border-gray-700">الفنيين</th>
                         <th className="p-2 text-right border border-gray-700">ملاحظات</th>
                         <th className="p-2 text-center border border-gray-700 w-24">إجراءات</th>
+                        {/* ✅ عمود حذف القسم الأول */}
+                        <th className="p-2 text-center border border-gray-700 w-12">حذف</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -298,6 +300,10 @@ export default function AdminReview() {
                             <td className="p-2 border border-gray-700 text-gray-400">{item.notes || '-'}</td>
                             <td className="p-2 border border-gray-700 text-center">
                                 <button onClick={() => openExtraModal(item)} className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-2 py-1 rounded shadow">➕ إضافة</button>
+                            </td>
+                            {/* ✅ زر الحذف للقسم الأول */}
+                            <td className="p-2 border border-gray-700 text-center">
+                                <button onClick={() => handleDeleteIncentive(item.ids, item.sale_id)} className="text-red-500 hover:text-red-400 font-bold text-lg">&times;</button>
                             </td>
                         </tr>
                     ))}
@@ -322,6 +328,8 @@ export default function AdminReview() {
                         <th className="p-2 text-right border border-gray-700">المبلغ الأصلي</th>
                         <th className="p-2 text-right border border-gray-700">نوع التسجيل</th>
                         <th className="p-2 text-right border border-gray-700">الفنيين</th>
+                        {/* ✅ عمود حذف القسم الثاني */}
+                        <th className="p-2 text-center border border-gray-700 w-12">حذف</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-700">
@@ -342,6 +350,10 @@ export default function AdminReview() {
                                         <span key={idx} className="bg-gray-700 px-2 py-0.5 rounded text-xs">{name}</span>
                                     ))}
                                 </div>
+                            </td>
+                            {/* ✅ زر الحذف للقسم الثاني */}
+                            <td className="p-2 border border-gray-700 text-center">
+                                <button onClick={() => handleDeleteIncentive(item.ids, item.sale_id)} className="text-red-500 hover:text-red-400 font-bold text-lg">&times;</button>
                             </td>
                         </tr>
                     ))}

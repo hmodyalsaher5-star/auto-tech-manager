@@ -10,9 +10,10 @@ export default function AccountsDashboard({ onNavigate, onBack }) {
         <button onClick={onBack} className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded transition">🏠 الرئيسية</button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+      {/* تم تعديل الشبكة لتكون عمودين (md:grid-cols-2) لتناسب 4 أزرار بشكل أجمل */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
         
-        {/* ✅ 1. زر المراجعة (الجديد) */}
+        {/* 1. زر المراجعة */}
         <div 
             onClick={() => onNavigate('review')} 
             className="bg-gradient-to-br from-purple-900 to-purple-800 p-6 rounded-xl shadow-lg border border-purple-600 cursor-pointer hover:scale-105 transition transform relative overflow-hidden group"
@@ -20,10 +21,20 @@ export default function AccountsDashboard({ onNavigate, onBack }) {
             <div className="absolute top-0 right-0 bg-white/10 w-20 h-20 rounded-full -mr-10 -mt-10 blur-xl group-hover:bg-white/20 transition"></div>
             <div className="text-4xl mb-3">🔍</div>
             <h2 className="text-xl font-bold">مراجعة وتعيين الفنيين</h2>
-            <p className="text-sm text-gray-300 mt-2">مراجعة المبيعات الواردة من المحاسب وتوزيعها على الفنيين.</p>
+            <p className="text-sm text-gray-300 mt-2">مراجعة المبيعات وتوزيعها على الفنيين.</p>
         </div>
 
-        {/* 2. زر توزيع الأرباح */}
+        {/* 2. زر الكاشير (جديد ✅) */}
+        <div 
+            onClick={() => onNavigate('cashier')}
+            className="bg-gradient-to-br from-teal-900 to-teal-800 p-6 rounded-xl shadow-lg border border-teal-600 cursor-pointer hover:scale-105 transition transform"
+        >
+            <div className="text-4xl mb-3">💵</div>
+            <h2 className="text-xl font-bold">الكاشير / استلام</h2>
+            <p className="text-sm text-gray-300 mt-2">استلام المبالغ من المبيعات وتأكيد الدفع.</p>
+        </div>
+
+        {/* 3. زر محاسبة الفنيين */}
         <div 
             onClick={() => onNavigate('payout')}
             className="bg-gradient-to-br from-blue-900 to-blue-800 p-6 rounded-xl shadow-lg border border-blue-600 cursor-pointer hover:scale-105 transition transform"
@@ -33,7 +44,7 @@ export default function AccountsDashboard({ onNavigate, onBack }) {
             <p className="text-sm text-gray-300 mt-2">حساب الرواتب اليومية وإغلاق الصندوق.</p>
         </div>
 
-        {/* 3. زر التقارير */}
+        {/* 4. زر التقارير */}
         <div 
             onClick={() => onNavigate('dailyReport')}
             className="bg-gradient-to-br from-green-900 to-green-800 p-6 rounded-xl shadow-lg border border-green-600 cursor-pointer hover:scale-105 transition transform"
