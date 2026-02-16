@@ -147,10 +147,14 @@ export default function AdminReview() {
 
     const incentivesPayload = []; 
     const salesToUpdate = [];
-
+// داخل دالة handleBulkTransfer
     selectedForTransfer.forEach(saleId => {
         const assignment = tempAssignments[saleId];
-        if (assignment && assignment.techs.length > 0) {
+        
+        // ✅ 1. العثور على سجل البيع الأصلي لجلب التاريخ منه
+        const originalSale = salesToReview.find(s => s.id === saleId);
+
+        if (assignment && assignment.techs.length > 0 && originalSale) {
             const standardVal = assignment.is_standard ? 5000 : 0;
             const additionalVal = Number(assignment.additional_amount) || 0;
             const totalForCar = standardVal + additionalVal;
@@ -166,7 +170,10 @@ export default function AdminReview() {
                 is_standard: assignment.is_standard,
                 additional_amount: additionalVal,
                 amount: totalForCar,
-                notes: assignment.notes
+                notes: assignment.notes,
+                
+                // ✅ 2. هذا هو السطر السحري: نستخدم تاريخ البيع الأصلي بدلاً من تاريخ اليوم
+                created_at: originalSale.created_at 
             });
             salesToUpdate.push(saleId);
         }
