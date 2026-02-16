@@ -11,6 +11,7 @@ export default function AdminReview() {
   const [tempAssignments, setTempAssignments] = useState({});
   const [selectedForTransfer, setSelectedForTransfer] = useState([]);
 
+  // حالات النوافذ المنبثقة
   const [isModalOpen, setIsModalOpen] = useState(false); 
   const [currentSaleId, setCurrentSaleId] = useState(null);
   const [modalTechId, setModalTechId] = useState('');
@@ -18,6 +19,10 @@ export default function AdminReview() {
   const [isExtraModalOpen, setIsExtraModalOpen] = useState(false);
   const [extraTarget, setExtraTarget] = useState(null); 
   const [extraAmount, setExtraAmount] = useState('');
+
+  // ✅ حالة نافذة التعديل الجديدة
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingSaleData, setEditingSaleData] = useState(null);
 
   // جلب البيانات
   useEffect(() => {
@@ -58,12 +63,35 @@ export default function AdminReview() {
     }
   };
 
-  // ✅ دالة حذف السجل من المراجعة (Inbox)
+  // ✅ فتح نافذة التعديل
+  const openEditModal = (sale) => {
+      setEditingSaleData({ ...sale }); // نسخ البيانات لتعديلها
+      setIsEditModalOpen(true);
+  };
+
+  // ✅ حفظ التعديلات في قاعدة البيانات
+  const handleSaveEdit = async () => {
+      if (!editingSaleData.car_type || !editingSaleData.amount_total) return alert("الرجاء التأكد من البيانات");
+
+      const { error } = await supabase.from('sales_operations').update({
+          car_type: editingSaleData.car_type,
+          details: editingSaleData.details,
+          amount_total: Number(editingSaleData.amount_total)
+      }).eq('id', editingSaleData.id);
+
+      if (error) {
+          alert("❌ حدث خطأ أثناء التعديل: " + error.message);
+      } else {
+          alert("✅ تم تعديل البيانات بنجاح");
+          setIsEditModalOpen(false);
+          refreshData(); // تحديث الجدول
+      }
+  };
+
+  // حذف السجل
   const handleDeleteSale = async (saleId) => {
       if (!window.confirm("هل أنت متأكد من حذف هذا السجل نهائياً؟ (سيتم إلغاء عملية البيع)")) return;
-      
       const { error } = await supabase.from('sales_operations').delete().eq('id', saleId);
-      
       if (error) alert("❌ خطأ أثناء الحذف: " + error.message);
       else {
           alert("🗑️ تم الحذف بنجاح");
@@ -71,33 +99,18 @@ export default function AdminReview() {
       }
   };
 
-  // ✅ دالة حذف الحافز من القسمين الأول والثاني (إلغاء الترحيل)
+  // حذف الحافز وإلغاء الترحيل
   const handleDeleteIncentive = async (ids, saleId) => {
     if (!window.confirm("هل تريد حذف هذا الحافز وإعادة الطلب للقائمة العلوية؟")) return;
-
-    // 1. حذف الحوافز المسجلة
-    const { error: deleteError } = await supabase
-        .from('technician_incentives')
-        .delete()
-        .in('id', ids);
-
+    const { error: deleteError } = await supabase.from('technician_incentives').delete().in('id', ids);
     if (deleteError) return alert("❌ خطأ في الحذف: " + deleteError.message);
-
-    // 2. إعادة حالة الطلب إلى confirmed ليعود للجدول العلوي
-    const { error: updateError } = await supabase
-        .from('sales_operations')
-        .update({ status: 'confirmed' })
-        .eq('id', saleId);
-
+    const { error: updateError } = await supabase.from('sales_operations').update({ status: 'confirmed' }).eq('id', saleId);
     if (updateError) alert("⚠️ تم الحذف لكن فشل تحديث حالة الطلب");
-    else {
-        alert("✅ تم الحذف وإعادة الطلب للمراجعة");
-        refreshData();
-    }
+    else { alert("✅ تم الحذف وإعادة الطلب للمراجعة"); refreshData(); }
   };
 
-  // --- بقية الدوال ---
   const openExtraModal = (item) => { setExtraTarget(item); setExtraAmount(''); setIsExtraModalOpen(true); };
+  
   const submitExtraFromSection1 = async () => {
     if (!extraAmount || Number(extraAmount) <= 0) return alert("الرجاء إدخال مبلغ صحيح");
     const targetId = extraTarget.ids[0]; 
@@ -147,17 +160,16 @@ export default function AdminReview() {
 
     const incentivesPayload = []; 
     const salesToUpdate = [];
-// داخل دالة handleBulkTransfer
+
     selectedForTransfer.forEach(saleId => {
         const assignment = tempAssignments[saleId];
-        
-        // ✅ 1. العثور على سجل البيع الأصلي لجلب التاريخ منه
         const originalSale = salesToReview.find(s => s.id === saleId);
 
         if (assignment && assignment.techs.length > 0 && originalSale) {
-            const standardVal = assignment.is_standard ? 5000 : 0;
+            const standardVal = assignment.is_standard ? 5000 : 0; // القيمة الثابتة
             const additionalVal = Number(assignment.additional_amount) || 0;
             const totalForCar = standardVal + additionalVal;
+            
             if (totalForCar === 0) return;
 
             const combinedTechNames = assignment.techs.map(t => t.name).join(' & ');
@@ -171,9 +183,7 @@ export default function AdminReview() {
                 additional_amount: additionalVal,
                 amount: totalForCar,
                 notes: assignment.notes,
-                
-                // ✅ 2. هذا هو السطر السحري: نستخدم تاريخ البيع الأصلي بدلاً من تاريخ اليوم
-                created_at: originalSale.created_at 
+                created_at: originalSale.created_at // يرث التاريخ الأصلي
             });
             salesToUpdate.push(saleId);
         }
@@ -231,7 +241,7 @@ export default function AdminReview() {
                         <th className="p-3 text-center border border-gray-700 w-24">شامل 5000؟</th>
                         <th className="p-3 text-right border border-gray-700 w-32">مبلغ إضافي</th>
                         <th className="p-3 text-right border border-gray-700">ملاحظات</th>
-                        <th className="p-3 text-center border border-gray-700 w-12">حذف</th>
+                        <th className="p-3 text-center border border-gray-700 w-24">إجراءات</th> {/* تعديل العنوان */}
                     </tr>
                 </thead>
                 <tbody>
@@ -256,14 +266,25 @@ export default function AdminReview() {
                                 <td className="p-3 border border-gray-700 text-center bg-blue-900/10"><input type="checkbox" className="w-5 h-5 rounded cursor-pointer accent-blue-500" checked={assigned.is_standard} onChange={(e) => updateAssignmentField(sale.id, 'is_standard', e.target.checked)} /></td>
                                 <td className="p-3 border border-gray-700 bg-purple-900/10"><input type="number" className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white focus:border-purple-500 outline-none text-center font-bold text-purple-300" placeholder="0" value={assigned.additional_amount} onChange={(e) => updateAssignmentField(sale.id, 'additional_amount', e.target.value)} /></td>
                                 <td className="p-3 border border-gray-700"><input type="text" className="w-full bg-transparent border-b border-gray-600 focus:border-blue-500 outline-none text-white text-sm" placeholder="ملاحظة..." value={assigned.notes} onChange={(e) => updateAssignmentField(sale.id, 'notes', e.target.value)} /></td>
+                                
+                                {/* ✅ عمود الإجراءات (تعديل + حذف) */}
                                 <td className="p-3 border border-gray-700 text-center">
-                                    <button 
-                                        onClick={() => handleDeleteSale(sale.id)} 
-                                        className="text-red-500 hover:text-red-400 font-bold text-xl transition transform hover:scale-110"
-                                        title="حذف السجل"
-                                    >
-                                        &times;
-                                    </button>
+                                    <div className="flex items-center justify-center gap-2">
+                                        <button 
+                                            onClick={() => openEditModal(sale)}
+                                            className="bg-blue-600 hover:bg-blue-500 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm shadow transition"
+                                            title="تعديل البيانات"
+                                        >
+                                            ✏️
+                                        </button>
+                                        <button 
+                                            onClick={() => handleDeleteSale(sale.id)} 
+                                            className="bg-red-600 hover:bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center text-lg font-bold shadow transition"
+                                            title="حذف السجل"
+                                        >
+                                            &times;
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         );
@@ -287,7 +308,6 @@ export default function AdminReview() {
                         <th className="p-2 text-right border border-gray-700">الفنيين</th>
                         <th className="p-2 text-right border border-gray-700">ملاحظات</th>
                         <th className="p-2 text-center border border-gray-700 w-24">إجراءات</th>
-                        {/* ✅ عمود حذف القسم الأول */}
                         <th className="p-2 text-center border border-gray-700 w-12">حذف</th>
                     </tr>
                 </thead>
@@ -308,7 +328,6 @@ export default function AdminReview() {
                             <td className="p-2 border border-gray-700 text-center">
                                 <button onClick={() => openExtraModal(item)} className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-2 py-1 rounded shadow">➕ إضافة</button>
                             </td>
-                            {/* ✅ زر الحذف للقسم الأول */}
                             <td className="p-2 border border-gray-700 text-center">
                                 <button onClick={() => handleDeleteIncentive(item.ids, item.sale_id)} className="text-red-500 hover:text-red-400 font-bold text-lg">&times;</button>
                             </td>
@@ -335,7 +354,6 @@ export default function AdminReview() {
                         <th className="p-2 text-right border border-gray-700">المبلغ الأصلي</th>
                         <th className="p-2 text-right border border-gray-700">نوع التسجيل</th>
                         <th className="p-2 text-right border border-gray-700">الفنيين</th>
-                        {/* ✅ عمود حذف القسم الثاني */}
                         <th className="p-2 text-center border border-gray-700 w-12">حذف</th>
                     </tr>
                 </thead>
@@ -358,7 +376,6 @@ export default function AdminReview() {
                                     ))}
                                 </div>
                             </td>
-                            {/* ✅ زر الحذف للقسم الثاني */}
                             <td className="p-2 border border-gray-700 text-center">
                                 <button onClick={() => handleDeleteIncentive(item.ids, item.sale_id)} className="text-red-500 hover:text-red-400 font-bold text-lg">&times;</button>
                             </td>
@@ -415,6 +432,52 @@ export default function AdminReview() {
                 <div className="flex gap-3">
                     <button onClick={() => setIsExtraModalOpen(false)} className="flex-1 py-2 bg-gray-600 text-white rounded hover:bg-gray-500">إلغاء</button>
                     <button onClick={submitExtraFromSection1} className="flex-1 py-2 bg-purple-600 text-white font-bold rounded hover:bg-purple-500 shadow-lg">حفظ وترحيل ✅</button>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* ✅ نافذة تعديل البيانات (Modal) الجديدة */}
+      {isEditModalOpen && editingSaleData && (
+        <div className="fixed inset-0 bg-black/80 flex justify-center items-center z-50 p-4">
+            <div className="bg-gray-800 w-full max-w-md rounded-lg shadow-2xl border border-gray-600 p-6 animate-scaleIn dir-rtl text-right">
+                <h3 className="text-xl font-bold text-white mb-6 border-b border-gray-700 pb-2">✏️ تعديل بيانات السجل</h3>
+                
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-gray-400 text-sm mb-1">نوع السيارة / المنتج</label>
+                        <input 
+                            type="text" 
+                            value={editingSaleData.car_type} 
+                            onChange={(e) => setEditingSaleData({...editingSaleData, car_type: e.target.value})} 
+                            className="w-full p-3 rounded bg-gray-700 text-white border border-gray-500 focus:border-blue-500 outline-none" 
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-gray-400 text-sm mb-1">السعر الإجمالي (د.ع)</label>
+                        <input 
+                            type="number" 
+                            value={editingSaleData.amount_total} 
+                            onChange={(e) => setEditingSaleData({...editingSaleData, amount_total: e.target.value})} 
+                            className="w-full p-3 rounded bg-gray-700 text-white border border-gray-500 focus:border-blue-500 outline-none font-bold text-lg text-green-400 dir-ltr" 
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-gray-400 text-sm mb-1">التفاصيل / الملاحظات</label>
+                        <textarea 
+                            rows="3"
+                            value={editingSaleData.details} 
+                            onChange={(e) => setEditingSaleData({...editingSaleData, details: e.target.value})} 
+                            className="w-full p-3 rounded bg-gray-700 text-white border border-gray-500 focus:border-blue-500 outline-none" 
+                        />
+                    </div>
+                </div>
+
+                <div className="flex gap-3 mt-8">
+                    <button onClick={() => setIsEditModalOpen(false)} className="flex-1 py-2 bg-gray-600 text-white rounded hover:bg-gray-500 transition">إلغاء</button>
+                    <button onClick={handleSaveEdit} className="flex-1 py-2 bg-blue-600 text-white font-bold rounded hover:bg-blue-500 shadow-lg transition transform hover:scale-105">حفظ التعديلات ✅</button>
                 </div>
             </div>
         </div>
