@@ -11,7 +11,6 @@ export default function AdminReview() {
   const [tempAssignments, setTempAssignments] = useState({});
   const [selectedForTransfer, setSelectedForTransfer] = useState([]);
 
-  // حالات النوافذ المنبثقة
   const [isModalOpen, setIsModalOpen] = useState(false); 
   const [currentSaleId, setCurrentSaleId] = useState(null);
   const [modalTechId, setModalTechId] = useState('');
@@ -23,8 +22,14 @@ export default function AdminReview() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingSaleData, setEditingSaleData] = useState(null);
 
-  // حالة فلتر التاريخ
+  // حالة فلتر التاريخ (الافتراضي: تاريخ اليوم)
   const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // دالة مساعدة لقص التاريخ بشكل آمن ومنع مشاكل التوقيت
+  const safeDate = (dateString) => {
+      if (!dateString) return '';
+      return dateString.substring(0, 10); // تأخذ YYYY-MM-DD فقط
+  };
 
   // جلب البيانات
   useEffect(() => {
@@ -38,9 +43,10 @@ export default function AdminReview() {
         const { data: techs } = await supabase.from('technicians').select('*').order('created_at', { ascending: true }); 
         if (isMounted && techs) setTechnicians(techs);
 
+        // ✅ التعديل هنا: جلبنا created_at الخاصة بالبيع الأصلي لربطها بالحوافز بدقة
         const { data: incentives } = await supabase
             .from('technician_incentives')
-            .select(`*, sales_operations (car_type, details, amount_total)`)
+            .select(`*, sales_operations (car_type, details, amount_total, created_at)`)
             .eq('is_paid', false)
             .order('created_at', { ascending: false });
 
@@ -58,32 +64,36 @@ export default function AdminReview() {
   const refreshData = async () => {
     const { data: sales } = await supabase.from('sales_operations').select('*').eq('status', 'confirmed').order('created_at', { ascending: false });
     if (sales) setSalesToReview(sales);
-    const { data: incentives } = await supabase.from('technician_incentives').select(`*, sales_operations (car_type, details, amount_total)`).eq('is_paid', false).order('created_at', { ascending: false });
+    const { data: incentives } = await supabase.from('technician_incentives').select(`*, sales_operations (car_type, details, amount_total, created_at)`).eq('is_paid', false).order('created_at', { ascending: false });
     if (incentives) {
         setSection1Data(incentives.filter(item => item.is_standard));
         setSection2Data(incentives.filter(item => Number(item.additional_amount) > 0));
     }
   };
 
-  const filteredSalesToReview = salesToReview.filter(sale => {
+  // ✅ الفلترة الآمنة لجميع الأقسام بناءً على تاريخ "عملية البيع الأصلية"
+  const filteredSalesToReview = salesToReview.filter(sale => !filterDate || safeDate(sale.created_at) === filterDate);
+  
+  const filteredSection1Data = section1Data.filter(item => {
       if (!filterDate) return true;
-      const saleDate = new Date(sale.created_at).toISOString().split('T')[0];
-      return saleDate === filterDate;
+      const parentDate = item.sales_operations?.created_at || item.created_at; 
+      return safeDate(parentDate) === filterDate;
+  });
+
+  const filteredSection2Data = section2Data.filter(item => {
+      if (!filterDate) return true;
+      const parentDate = item.sales_operations?.created_at || item.created_at; 
+      return safeDate(parentDate) === filterDate;
   });
 
   const otherDatesCount = salesToReview.length - filteredSalesToReview.length;
 
-  const openEditModal = (sale) => {
-      setEditingSaleData({ ...sale });
-      setIsEditModalOpen(true);
-  };
+  const openEditModal = (sale) => { setEditingSaleData({ ...sale }); setIsEditModalOpen(true); };
 
   const handleSaveEdit = async () => {
       if (!editingSaleData.car_type || !editingSaleData.amount_total) return alert("الرجاء التأكد من البيانات");
       const { error } = await supabase.from('sales_operations').update({
-          car_type: editingSaleData.car_type,
-          details: editingSaleData.details,
-          amount_total: Number(editingSaleData.amount_total)
+          car_type: editingSaleData.car_type, details: editingSaleData.details, amount_total: Number(editingSaleData.amount_total)
       }).eq('id', editingSaleData.id);
       if (error) alert("❌ حدث خطأ: " + error.message);
       else { alert("✅ تم التعديل"); setIsEditModalOpen(false); refreshData(); }
@@ -97,20 +107,21 @@ export default function AdminReview() {
   };
 
   const handleDeleteIncentive = async (ids, saleId) => {
-    if (!window.confirm("حذف وإعادة للقائمة؟")) return;
+    if (!window.confirm("حذف وإعادة للقائمة العلوية؟")) return;
     const { error: deleteError } = await supabase.from('technician_incentives').delete().in('id', ids);
     if (deleteError) return alert("❌ خطأ: " + deleteError.message);
     const { error: updateError } = await supabase.from('sales_operations').update({ status: 'confirmed' }).eq('id', saleId);
-    if (updateError) alert("⚠️ فشل تحديث الحالة"); else { alert("✅ تم"); refreshData(); }
+    if (updateError) alert("⚠️ فشل تحديث الحالة"); else { alert("✅ تم الإرجاع بنجاح"); refreshData(); }
   };
 
   const openExtraModal = (item) => { setExtraTarget(item); setExtraAmount(''); setIsExtraModalOpen(true); };
+  
   const submitExtraFromSection1 = async () => {
     if (!extraAmount || Number(extraAmount) <= 0) return alert("مبلغ غير صحيح");
     const targetId = extraTarget.ids[0]; 
     const newTotal = 5000 + Number(extraAmount);
     const { error } = await supabase.from('technician_incentives').update({ additional_amount: Number(extraAmount), amount: newTotal }).eq('id', targetId);
-    if (error) alert("خطأ: " + error.message); else { alert("✅ تم"); setIsExtraModalOpen(false); refreshData(); }
+    if (error) alert("خطأ: " + error.message); else { alert("✅ تم الحفظ"); setIsExtraModalOpen(false); refreshData(); }
   };
 
   const openTechModal = (saleId) => {
@@ -197,12 +208,10 @@ export default function AdminReview() {
     return Object.values(grouped);
   };
 
-  const groupedSection1 = groupIncentives(section1Data);
-  const groupedSection2 = groupIncentives(section2Data);
+  const groupedSection1 = groupIncentives(filteredSection1Data);
+  const groupedSection2 = groupIncentives(filteredSection2Data);
 
-  // ✅✅ هنا التصحيح: تعريف المتغير المفقود ✅✅
   const totalSection1Count = groupedSection1.length; 
-
   const totalStandardAmount = groupedSection1.reduce((sum, item) => {
       const itemTotal = Number(item.amount); const itemAdditional = Number(item.additional_amount);
       return sum + (itemTotal - itemAdditional);
@@ -220,7 +229,7 @@ export default function AdminReview() {
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
             <div>
                 <h2 className="text-xl font-bold text-yellow-400">📥 مبيعات بانتظار التحديد</h2>
-                <p className="text-xs text-gray-400 mt-1">يتم عرض المبيعات حسب التاريخ المحدد فقط</p>
+                <p className="text-xs text-gray-400 mt-1">يتم عرض المعاملات حسب التاريخ المحدد فقط</p>
             </div>
 
             {/* شريط فلترة التاريخ */}
@@ -230,7 +239,7 @@ export default function AdminReview() {
                     type="date" 
                     value={filterDate} 
                     onChange={(e) => setFilterDate(e.target.value)} 
-                    className="bg-gray-800 text-white border border-gray-500 rounded p-1 text-sm focus:border-yellow-400 outline-none"
+                    className="bg-gray-800 text-white border border-gray-500 rounded p-1 text-sm focus:border-yellow-400 outline-none cursor-pointer"
                 />
                 <button onClick={() => setFilterDate('')} className="text-xs text-blue-300 underline hover:text-blue-200">عرض الكل</button>
             </div>
@@ -238,10 +247,9 @@ export default function AdminReview() {
             {selectedForTransfer.length > 0 && <button onClick={handleBulkTransfer} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded shadow-lg animate-pulse">ترحيل ({selectedForTransfer.length}) ⬅️</button>}
         </div>
 
-        {/* تنبيه بوجود مبيعات في تواريخ أخرى */}
         {otherDatesCount > 0 && (
             <div className="bg-yellow-900/30 border border-yellow-700 p-2 mb-4 rounded text-center text-yellow-200 text-sm">
-                ⚠️ يوجد ({otherDatesCount}) عمليات معلقة في تواريخ أخرى. غير التاريخ لمشاهدتها.
+                ⚠️ يوجد ({otherDatesCount}) عمليات معلقة في تواريخ أخرى. قم بتغيير التاريخ لمشاهدتها.
             </div>
         )}
 
@@ -270,7 +278,7 @@ export default function AdminReview() {
                                 <td className="p-3 border border-gray-700">
                                     <div className="font-bold text-white text-base">{sale.car_type}</div>
                                     <div className="text-gray-400">{sale.details}</div>
-                                    <div className="text-xs text-blue-300 mt-1 font-mono">{new Date(sale.created_at).toLocaleDateString('en-CA')}</div>
+                                    <div className="text-xs text-blue-300 mt-1 font-mono">{safeDate(sale.created_at)}</div>
                                     <div className="text-xs text-yellow-500 mt-1 font-mono">الأصلي: {Number(sale.amount_total).toLocaleString()}</div>
                                 </td>
                                 <td className="p-3 border border-gray-700">
@@ -323,7 +331,7 @@ export default function AdminReview() {
                             <td className="p-2 border border-gray-700 text-center">{index + 1}</td>
                             <td className="p-2 border border-gray-700 font-bold text-white">
                                 {item.sales_operations?.car_type}
-                                <div className="text-xs text-blue-300 font-mono mt-1">{new Date(item.created_at).toLocaleDateString('en-CA')}</div>
+                                <div className="text-xs text-blue-300 font-mono mt-1">{safeDate(item.sales_operations?.created_at || item.created_at)}</div>
                             </td>
                             <td className="p-2 border border-gray-700 text-yellow-500">{Number(item.sales_operations?.amount_total).toLocaleString()}</td>
                             <td className="p-2 border border-gray-700 text-blue-300">
@@ -334,11 +342,11 @@ export default function AdminReview() {
                             <td className="p-2 border border-gray-700 text-center"><button onClick={() => handleDeleteIncentive(item.ids, item.sale_id)} className="text-red-500 hover:text-red-400 font-bold text-lg">&times;</button></td>
                         </tr>
                     ))}
+                    {groupedSection1.length === 0 && <tr><td colSpan="7" className="p-4 text-center text-gray-500">لا توجد حوافز لهذا التاريخ</td></tr>}
                 </tbody>
             </table>
         </div>
         <div className="mt-4 text-left bg-blue-900/20 p-3 rounded border border-blue-900 inline-block">
-            {/* ✅ الآن هذا المتغير معرف ولن يسبب خطأ */}
             <span className="text-gray-400 ml-2">مجموع القسم الأول:</span>
             <span className="text-2xl font-bold text-blue-400">{totalSection1Count} (سيارات) × 5,000 = {totalStandardAmount.toLocaleString()} د.ع</span>
         </div>
@@ -364,7 +372,7 @@ export default function AdminReview() {
                         <tr key={item.sale_id} className="hover:bg-gray-700/50">
                             <td className="p-2 border border-gray-700">
                                 <span className="block text-white font-bold">{item.sales_operations?.car_type}</span>
-                                <span className="text-xs text-blue-300 font-mono mt-1">{new Date(item.created_at).toLocaleDateString('en-CA')}</span>
+                                <span className="text-xs text-blue-300 font-mono mt-1 block">{safeDate(item.sales_operations?.created_at || item.created_at)}</span>
                             </td>
                             <td className="p-2 border border-gray-700 text-green-400 font-bold text-lg">{Number(item.additional_amount).toLocaleString()}</td>
                             <td className="p-2 border border-gray-700 text-yellow-500">{Number(item.sales_operations?.amount_total).toLocaleString()}</td>
@@ -373,6 +381,7 @@ export default function AdminReview() {
                             <td className="p-2 border border-gray-700 text-center"><button onClick={() => handleDeleteIncentive(item.ids, item.sale_id)} className="text-red-500 hover:text-red-400 font-bold text-lg">&times;</button></td>
                         </tr>
                     ))}
+                    {groupedSection2.length === 0 && <tr><td colSpan="6" className="p-4 text-center text-gray-500">لا توجد حوافز إضافية لهذا التاريخ</td></tr>}
                 </tbody>
             </table>
         </div>
@@ -383,7 +392,7 @@ export default function AdminReview() {
       </div>
 
       <div className="bg-gradient-to-l from-green-900 to-gray-800 p-6 rounded-lg border border-green-600 text-center shadow-2xl">
-        <h3 className="text-gray-300 mb-2 text-lg">المجموع الكلي للحوافز</h3>
+        <h3 className="text-gray-300 mb-2 text-lg">المجموع الكلي للحوافز (للتاريخ المحدد)</h3>
         <div className="text-4xl font-bold text-white dir-ltr">{grandTotal.toLocaleString()} <span className="text-green-400 text-2xl">د.ع</span></div>
       </div>
 
@@ -429,7 +438,6 @@ export default function AdminReview() {
         </div>
       )}
 
-      {/* نافذة تعديل البيانات */}
       {isEditModalOpen && editingSaleData && (
         <div className="fixed inset-0 bg-black/80 flex justify-center items-center z-50 p-4">
             <div className="bg-gray-800 w-full max-w-md rounded-lg shadow-2xl border border-gray-600 p-6 animate-scaleIn dir-rtl text-right">
