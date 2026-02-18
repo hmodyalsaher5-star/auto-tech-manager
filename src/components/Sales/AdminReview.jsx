@@ -20,9 +20,11 @@ export default function AdminReview() {
   const [extraTarget, setExtraTarget] = useState(null); 
   const [extraAmount, setExtraAmount] = useState('');
 
-  // ✅ حالة نافذة التعديل الجديدة
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingSaleData, setEditingSaleData] = useState(null);
+
+  // حالة فلتر التاريخ
+  const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
 
   // جلب البيانات
   useEffect(() => {
@@ -63,67 +65,58 @@ export default function AdminReview() {
     }
   };
 
-  // ✅ فتح نافذة التعديل
+  const filteredSalesToReview = salesToReview.filter(sale => {
+      if (!filterDate) return true;
+      const saleDate = new Date(sale.created_at).toISOString().split('T')[0];
+      return saleDate === filterDate;
+  });
+
+  const otherDatesCount = salesToReview.length - filteredSalesToReview.length;
+
   const openEditModal = (sale) => {
-      setEditingSaleData({ ...sale }); // نسخ البيانات لتعديلها
+      setEditingSaleData({ ...sale });
       setIsEditModalOpen(true);
   };
 
-  // ✅ حفظ التعديلات في قاعدة البيانات
   const handleSaveEdit = async () => {
       if (!editingSaleData.car_type || !editingSaleData.amount_total) return alert("الرجاء التأكد من البيانات");
-
       const { error } = await supabase.from('sales_operations').update({
           car_type: editingSaleData.car_type,
           details: editingSaleData.details,
           amount_total: Number(editingSaleData.amount_total)
       }).eq('id', editingSaleData.id);
-
-      if (error) {
-          alert("❌ حدث خطأ أثناء التعديل: " + error.message);
-      } else {
-          alert("✅ تم تعديل البيانات بنجاح");
-          setIsEditModalOpen(false);
-          refreshData(); // تحديث الجدول
-      }
+      if (error) alert("❌ حدث خطأ: " + error.message);
+      else { alert("✅ تم التعديل"); setIsEditModalOpen(false); refreshData(); }
   };
 
-  // حذف السجل
   const handleDeleteSale = async (saleId) => {
-      if (!window.confirm("هل أنت متأكد من حذف هذا السجل نهائياً؟ (سيتم إلغاء عملية البيع)")) return;
+      if (!window.confirm("حذف نهائي؟")) return;
       const { error } = await supabase.from('sales_operations').delete().eq('id', saleId);
-      if (error) alert("❌ خطأ أثناء الحذف: " + error.message);
-      else {
-          alert("🗑️ تم الحذف بنجاح");
-          setSalesToReview(prev => prev.filter(s => s.id !== saleId)); 
-      }
+      if (error) alert("❌ خطأ: " + error.message);
+      else { alert("🗑️ تم الحذف"); setSalesToReview(prev => prev.filter(s => s.id !== saleId)); }
   };
 
-  // حذف الحافز وإلغاء الترحيل
   const handleDeleteIncentive = async (ids, saleId) => {
-    if (!window.confirm("هل تريد حذف هذا الحافز وإعادة الطلب للقائمة العلوية؟")) return;
+    if (!window.confirm("حذف وإعادة للقائمة؟")) return;
     const { error: deleteError } = await supabase.from('technician_incentives').delete().in('id', ids);
-    if (deleteError) return alert("❌ خطأ في الحذف: " + deleteError.message);
+    if (deleteError) return alert("❌ خطأ: " + deleteError.message);
     const { error: updateError } = await supabase.from('sales_operations').update({ status: 'confirmed' }).eq('id', saleId);
-    if (updateError) alert("⚠️ تم الحذف لكن فشل تحديث حالة الطلب");
-    else { alert("✅ تم الحذف وإعادة الطلب للمراجعة"); refreshData(); }
+    if (updateError) alert("⚠️ فشل تحديث الحالة"); else { alert("✅ تم"); refreshData(); }
   };
 
   const openExtraModal = (item) => { setExtraTarget(item); setExtraAmount(''); setIsExtraModalOpen(true); };
-  
   const submitExtraFromSection1 = async () => {
-    if (!extraAmount || Number(extraAmount) <= 0) return alert("الرجاء إدخال مبلغ صحيح");
+    if (!extraAmount || Number(extraAmount) <= 0) return alert("مبلغ غير صحيح");
     const targetId = extraTarget.ids[0]; 
     const newTotal = 5000 + Number(extraAmount);
     const { error } = await supabase.from('technician_incentives').update({ additional_amount: Number(extraAmount), amount: newTotal }).eq('id', targetId);
-    if (error) alert("خطأ: " + error.message);
-    else { alert("✅ تم الترحيل"); setIsExtraModalOpen(false); refreshData(); }
+    if (error) alert("خطأ: " + error.message); else { alert("✅ تم"); setIsExtraModalOpen(false); refreshData(); }
   };
 
   const openTechModal = (saleId) => {
     setCurrentSaleId(saleId); setModalTechId(''); setIsModalOpen(true);
     if (!tempAssignments[saleId]) {
-        setTempAssignments(prev => ({ ...prev, [saleId]: { techs: [], notes: '', is_standard: true, additional_amount: 0 } }));
+        setTempAssignments(prev => ({ ...prev, [saleId]: { techs: [], notes: '', is_standard: true, standard_amount: 2000, additional_amount: 0 } }));
     }
   };
 
@@ -144,7 +137,7 @@ export default function AdminReview() {
 
   const updateAssignmentField = (saleId, field, value) => {
     setTempAssignments(prev => {
-        const current = prev[saleId] || { techs: [], notes: '', is_standard: true, additional_amount: 0 };
+        const current = prev[saleId] || { techs: [], notes: '', is_standard: true, standard_amount: 2000, additional_amount: 0 };
         return { ...prev, [saleId]: { ...current, [field]: value } };
     });
   };
@@ -156,7 +149,7 @@ export default function AdminReview() {
   
   const handleBulkTransfer = async () => {
     if (selectedForTransfer.length === 0) return;
-    if (!window.confirm(`هل أنت متأكد من ترحيل ${selectedForTransfer.length} عمليات؟`)) return;
+    if (!window.confirm(`ترحيل ${selectedForTransfer.length} عمليات؟`)) return;
 
     const incentivesPayload = []; 
     const salesToUpdate = [];
@@ -166,37 +159,29 @@ export default function AdminReview() {
         const originalSale = salesToReview.find(s => s.id === saleId);
 
         if (assignment && assignment.techs.length > 0 && originalSale) {
-            const standardVal = assignment.is_standard ? 5000 : 0; // القيمة الثابتة
+            const standardVal = assignment.is_standard ? 5000 : 0; 
             const additionalVal = Number(assignment.additional_amount) || 0;
             const totalForCar = standardVal + additionalVal;
-            
             if (totalForCar === 0) return;
 
             const combinedTechNames = assignment.techs.map(t => t.name).join(' & ');
             const primaryTechId = assignment.techs[0].id;
 
             incentivesPayload.push({
-                sale_id: saleId,
-                technician_id: primaryTechId,
-                technician_name: combinedTechNames,
-                is_standard: assignment.is_standard,
-                additional_amount: additionalVal,
-                amount: totalForCar,
-                notes: assignment.notes,
-                created_at: originalSale.created_at // يرث التاريخ الأصلي
+                sale_id: saleId, technician_id: primaryTechId, technician_name: combinedTechNames,
+                is_standard: assignment.is_standard, additional_amount: additionalVal,
+                amount: totalForCar, notes: assignment.notes, created_at: originalSale.created_at 
             });
             salesToUpdate.push(saleId);
         }
     });
 
-    if (incentivesPayload.length === 0) return alert("❌ تأكد من تحديد البيانات!");
+    if (incentivesPayload.length === 0) return alert("❌ تأكد من البيانات");
     const { error: insertError } = await supabase.from('technician_incentives').insert(incentivesPayload);
     if (insertError) return alert("خطأ: " + insertError.message);
     await supabase.from('sales_operations').update({ status: 'reviewed' }).in('id', salesToUpdate);
-    alert("✅ تم الترحيل بنجاح"); 
-    setTempAssignments({}); 
-    setSelectedForTransfer([]); 
-    refreshData(); 
+    alert("✅ تم الترحيل"); 
+    setTempAssignments({}); setSelectedForTransfer([]); refreshData(); 
   };
 
   const groupIncentives = (items) => {
@@ -214,22 +199,52 @@ export default function AdminReview() {
 
   const groupedSection1 = groupIncentives(section1Data);
   const groupedSection2 = groupIncentives(section2Data);
+
+  // ✅✅ هنا التصحيح: تعريف المتغير المفقود ✅✅
   const totalSection1Count = groupedSection1.length; 
-  const totalStandardAmount = totalSection1Count * 5000;
+
+  const totalStandardAmount = groupedSection1.reduce((sum, item) => {
+      const itemTotal = Number(item.amount); const itemAdditional = Number(item.additional_amount);
+      return sum + (itemTotal - itemAdditional);
+  }, 0);
   const totalAdditionalSum = groupedSection2.reduce((sum, item) => sum + Number(item.additional_amount), 0);
   const grandTotal = totalStandardAmount + totalAdditionalSum;
 
-  if (loading) return <div className="text-center text-white py-10">جاري تحميل البيانات...</div>;
+  if (loading) return <div className="text-center text-white py-10">جاري التحميل...</div>;
 
   return (
     <div className="p-4 dir-rtl text-right space-y-8 animate-fadeIn max-w-[95%] mx-auto">
       
       {/* 🔴 Inbox - المبيعات الواردة */}
       <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 shadow-xl">
-        <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-yellow-400">📥 مبيعات بانتظار التحديد ({salesToReview.length})</h2>
+        <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+            <div>
+                <h2 className="text-xl font-bold text-yellow-400">📥 مبيعات بانتظار التحديد</h2>
+                <p className="text-xs text-gray-400 mt-1">يتم عرض المبيعات حسب التاريخ المحدد فقط</p>
+            </div>
+
+            {/* شريط فلترة التاريخ */}
+            <div className="flex items-center gap-2 bg-gray-700 p-2 rounded-lg border border-gray-600">
+                <span className="text-gray-300 text-sm">📅 عرض يوم:</span>
+                <input 
+                    type="date" 
+                    value={filterDate} 
+                    onChange={(e) => setFilterDate(e.target.value)} 
+                    className="bg-gray-800 text-white border border-gray-500 rounded p-1 text-sm focus:border-yellow-400 outline-none"
+                />
+                <button onClick={() => setFilterDate('')} className="text-xs text-blue-300 underline hover:text-blue-200">عرض الكل</button>
+            </div>
+
             {selectedForTransfer.length > 0 && <button onClick={handleBulkTransfer} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded shadow-lg animate-pulse">ترحيل ({selectedForTransfer.length}) ⬅️</button>}
         </div>
+
+        {/* تنبيه بوجود مبيعات في تواريخ أخرى */}
+        {otherDatesCount > 0 && (
+            <div className="bg-yellow-900/30 border border-yellow-700 p-2 mb-4 rounded text-center text-yellow-200 text-sm">
+                ⚠️ يوجد ({otherDatesCount}) عمليات معلقة في تواريخ أخرى. غير التاريخ لمشاهدتها.
+            </div>
+        )}
+
         <div className="overflow-x-auto">
             <table className="w-full text-sm text-gray-300 border-collapse">
                 <thead className="bg-gray-900 text-white">
@@ -241,18 +256,23 @@ export default function AdminReview() {
                         <th className="p-3 text-center border border-gray-700 w-24">شامل 5000؟</th>
                         <th className="p-3 text-right border border-gray-700 w-32">مبلغ إضافي</th>
                         <th className="p-3 text-right border border-gray-700">ملاحظات</th>
-                        <th className="p-3 text-center border border-gray-700 w-24">إجراءات</th> {/* تعديل العنوان */}
+                        <th className="p-3 text-center border border-gray-700 w-24">إجراءات</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {salesToReview.map((sale, index) => {
-                        const assigned = tempAssignments[sale.id] || { techs: [], notes: '', is_standard: true, additional_amount: 0 };
+                    {filteredSalesToReview.map((sale, index) => {
+                        const assigned = tempAssignments[sale.id] || { techs: [], notes: '', is_standard: true, standard_amount: 2000, additional_amount: 0 };
                         const hasTechs = assigned.techs.length > 0;
                         return (
                             <tr key={sale.id} className={`hover:bg-gray-700/50 transition ${selectedForTransfer.includes(sale.id) ? 'bg-blue-900/20' : ''}`}>
                                 <td className="p-3 text-center border border-gray-700"><input type="checkbox" className="w-5 h-5 rounded cursor-pointer" disabled={!hasTechs} checked={selectedForTransfer.includes(sale.id)} onChange={() => handleCheckboxChange(sale.id)} /></td>
                                 <td className="p-3 border border-gray-700 text-center">{index + 1}</td>
-                                <td className="p-3 border border-gray-700"><div className="font-bold text-white text-base">{sale.car_type}</div><div className="text-gray-400">{sale.details}</div><div className="text-xs text-yellow-500 mt-1 font-mono">الأصلي: {Number(sale.amount_total).toLocaleString()}</div></td>
+                                <td className="p-3 border border-gray-700">
+                                    <div className="font-bold text-white text-base">{sale.car_type}</div>
+                                    <div className="text-gray-400">{sale.details}</div>
+                                    <div className="text-xs text-blue-300 mt-1 font-mono">{new Date(sale.created_at).toLocaleDateString('en-CA')}</div>
+                                    <div className="text-xs text-yellow-500 mt-1 font-mono">الأصلي: {Number(sale.amount_total).toLocaleString()}</div>
+                                </td>
                                 <td className="p-3 border border-gray-700">
                                     <div className="flex flex-wrap gap-2 mb-2">
                                         {assigned.techs && assigned.techs.map(t => (
@@ -266,30 +286,16 @@ export default function AdminReview() {
                                 <td className="p-3 border border-gray-700 text-center bg-blue-900/10"><input type="checkbox" className="w-5 h-5 rounded cursor-pointer accent-blue-500" checked={assigned.is_standard} onChange={(e) => updateAssignmentField(sale.id, 'is_standard', e.target.checked)} /></td>
                                 <td className="p-3 border border-gray-700 bg-purple-900/10"><input type="number" className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white focus:border-purple-500 outline-none text-center font-bold text-purple-300" placeholder="0" value={assigned.additional_amount} onChange={(e) => updateAssignmentField(sale.id, 'additional_amount', e.target.value)} /></td>
                                 <td className="p-3 border border-gray-700"><input type="text" className="w-full bg-transparent border-b border-gray-600 focus:border-blue-500 outline-none text-white text-sm" placeholder="ملاحظة..." value={assigned.notes} onChange={(e) => updateAssignmentField(sale.id, 'notes', e.target.value)} /></td>
-                                
-                                {/* ✅ عمود الإجراءات (تعديل + حذف) */}
                                 <td className="p-3 border border-gray-700 text-center">
                                     <div className="flex items-center justify-center gap-2">
-                                        <button 
-                                            onClick={() => openEditModal(sale)}
-                                            className="bg-blue-600 hover:bg-blue-500 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm shadow transition"
-                                            title="تعديل البيانات"
-                                        >
-                                            ✏️
-                                        </button>
-                                        <button 
-                                            onClick={() => handleDeleteSale(sale.id)} 
-                                            className="bg-red-600 hover:bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center text-lg font-bold shadow transition"
-                                            title="حذف السجل"
-                                        >
-                                            &times;
-                                        </button>
+                                        <button onClick={() => openEditModal(sale)} className="bg-blue-600 hover:bg-blue-500 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm shadow transition" title="تعديل">✏️</button>
+                                        <button onClick={() => handleDeleteSale(sale.id)} className="bg-red-600 hover:bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center text-lg font-bold shadow transition" title="حذف">&times;</button>
                                     </div>
                                 </td>
                             </tr>
                         );
                     })}
-                    {salesToReview.length === 0 && <tr><td colSpan="8" className="p-6 text-center text-gray-500">لا توجد مبيعات بانتظار المراجعة</td></tr>}
+                    {filteredSalesToReview.length === 0 && <tr><td colSpan="8" className="p-6 text-center text-gray-500">لا توجد مبيعات لهذا التاريخ</td></tr>}
                 </tbody>
             </table>
         </div>
@@ -315,28 +321,24 @@ export default function AdminReview() {
                     {groupedSection1.map((item, index) => (
                         <tr key={item.sale_id} className="hover:bg-gray-700/50">
                             <td className="p-2 border border-gray-700 text-center">{index + 1}</td>
-                            <td className="p-2 border border-gray-700 font-bold text-white">{item.sales_operations?.car_type}</td>
+                            <td className="p-2 border border-gray-700 font-bold text-white">
+                                {item.sales_operations?.car_type}
+                                <div className="text-xs text-blue-300 font-mono mt-1">{new Date(item.created_at).toLocaleDateString('en-CA')}</div>
+                            </td>
                             <td className="p-2 border border-gray-700 text-yellow-500">{Number(item.sales_operations?.amount_total).toLocaleString()}</td>
                             <td className="p-2 border border-gray-700 text-blue-300">
-                                <div className="flex flex-wrap gap-1">
-                                    {item.tech_names.map((name, idx) => (
-                                        <span key={idx} className="bg-blue-900/50 border border-blue-700 px-2 py-0.5 rounded text-xs">{name}</span>
-                                    ))}
-                                </div>
+                                <div className="flex flex-wrap gap-1">{item.tech_names.map((name, idx) => (<span key={idx} className="bg-blue-900/50 border border-blue-700 px-2 py-0.5 rounded text-xs">{name}</span>))}</div>
                             </td>
                             <td className="p-2 border border-gray-700 text-gray-400">{item.notes || '-'}</td>
-                            <td className="p-2 border border-gray-700 text-center">
-                                <button onClick={() => openExtraModal(item)} className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-2 py-1 rounded shadow">➕ إضافة</button>
-                            </td>
-                            <td className="p-2 border border-gray-700 text-center">
-                                <button onClick={() => handleDeleteIncentive(item.ids, item.sale_id)} className="text-red-500 hover:text-red-400 font-bold text-lg">&times;</button>
-                            </td>
+                            <td className="p-2 border border-gray-700 text-center"><button onClick={() => openExtraModal(item)} className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-2 py-1 rounded shadow">➕ إضافة</button></td>
+                            <td className="p-2 border border-gray-700 text-center"><button onClick={() => handleDeleteIncentive(item.ids, item.sale_id)} className="text-red-500 hover:text-red-400 font-bold text-lg">&times;</button></td>
                         </tr>
                     ))}
                 </tbody>
             </table>
         </div>
         <div className="mt-4 text-left bg-blue-900/20 p-3 rounded border border-blue-900 inline-block">
+            {/* ✅ الآن هذا المتغير معرف ولن يسبب خطأ */}
             <span className="text-gray-400 ml-2">مجموع القسم الأول:</span>
             <span className="text-2xl font-bold text-blue-400">{totalSection1Count} (سيارات) × 5,000 = {totalStandardAmount.toLocaleString()} د.ع</span>
         </div>
@@ -362,23 +364,13 @@ export default function AdminReview() {
                         <tr key={item.sale_id} className="hover:bg-gray-700/50">
                             <td className="p-2 border border-gray-700">
                                 <span className="block text-white font-bold">{item.sales_operations?.car_type}</span>
-                                <span className="text-xs text-gray-400">{item.sales_operations?.details}</span>
+                                <span className="text-xs text-blue-300 font-mono mt-1">{new Date(item.created_at).toLocaleDateString('en-CA')}</span>
                             </td>
                             <td className="p-2 border border-gray-700 text-green-400 font-bold text-lg">{Number(item.additional_amount).toLocaleString()}</td>
                             <td className="p-2 border border-gray-700 text-yellow-500">{Number(item.sales_operations?.amount_total).toLocaleString()}</td>
-                            <td className="p-2 border border-gray-700">
-                                {item.is_standard ? <span className="bg-blue-900/50 text-blue-200 px-2 py-1 rounded text-xs border border-blue-800 block w-fit">➕ إضافة</span> : <span className="bg-purple-900/50 text-purple-200 px-2 py-1 rounded text-xs border border-purple-800 block w-fit">🖐️ يدوي</span>}
-                            </td>
-                            <td className="p-2 border border-gray-700 text-gray-300">
-                                <div className="flex flex-wrap gap-1">
-                                    {item.tech_names.map((name, idx) => (
-                                        <span key={idx} className="bg-gray-700 px-2 py-0.5 rounded text-xs">{name}</span>
-                                    ))}
-                                </div>
-                            </td>
-                            <td className="p-2 border border-gray-700 text-center">
-                                <button onClick={() => handleDeleteIncentive(item.ids, item.sale_id)} className="text-red-500 hover:text-red-400 font-bold text-lg">&times;</button>
-                            </td>
+                            <td className="p-2 border border-gray-700">{item.is_standard ? <span className="bg-blue-900/50 text-blue-200 px-2 py-1 rounded text-xs border border-blue-800 block w-fit">➕ إضافة</span> : <span className="bg-purple-900/50 text-purple-200 px-2 py-1 rounded text-xs border border-purple-800 block w-fit">🖐️ يدوي</span>}</td>
+                            <td className="p-2 border border-gray-700 text-gray-300"><div className="flex flex-wrap gap-1">{item.tech_names.map((name, idx) => (<span key={idx} className="bg-gray-700 px-2 py-0.5 rounded text-xs">{name}</span>))}</div></td>
+                            <td className="p-2 border border-gray-700 text-center"><button onClick={() => handleDeleteIncentive(item.ids, item.sale_id)} className="text-red-500 hover:text-red-400 font-bold text-lg">&times;</button></td>
                         </tr>
                     ))}
                 </tbody>
@@ -437,44 +429,25 @@ export default function AdminReview() {
         </div>
       )}
 
-      {/* ✅ نافذة تعديل البيانات (Modal) الجديدة */}
+      {/* نافذة تعديل البيانات */}
       {isEditModalOpen && editingSaleData && (
         <div className="fixed inset-0 bg-black/80 flex justify-center items-center z-50 p-4">
             <div className="bg-gray-800 w-full max-w-md rounded-lg shadow-2xl border border-gray-600 p-6 animate-scaleIn dir-rtl text-right">
                 <h3 className="text-xl font-bold text-white mb-6 border-b border-gray-700 pb-2">✏️ تعديل بيانات السجل</h3>
-                
                 <div className="space-y-4">
                     <div>
                         <label className="block text-gray-400 text-sm mb-1">نوع السيارة / المنتج</label>
-                        <input 
-                            type="text" 
-                            value={editingSaleData.car_type} 
-                            onChange={(e) => setEditingSaleData({...editingSaleData, car_type: e.target.value})} 
-                            className="w-full p-3 rounded bg-gray-700 text-white border border-gray-500 focus:border-blue-500 outline-none" 
-                        />
+                        <input type="text" value={editingSaleData.car_type} onChange={(e) => setEditingSaleData({...editingSaleData, car_type: e.target.value})} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-500 focus:border-blue-500 outline-none" />
                     </div>
-
                     <div>
                         <label className="block text-gray-400 text-sm mb-1">السعر الإجمالي (د.ع)</label>
-                        <input 
-                            type="number" 
-                            value={editingSaleData.amount_total} 
-                            onChange={(e) => setEditingSaleData({...editingSaleData, amount_total: e.target.value})} 
-                            className="w-full p-3 rounded bg-gray-700 text-white border border-gray-500 focus:border-blue-500 outline-none font-bold text-lg text-green-400 dir-ltr" 
-                        />
+                        <input type="number" value={editingSaleData.amount_total} onChange={(e) => setEditingSaleData({...editingSaleData, amount_total: e.target.value})} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-500 focus:border-blue-500 outline-none font-bold text-lg text-green-400 dir-ltr" />
                     </div>
-
                     <div>
                         <label className="block text-gray-400 text-sm mb-1">التفاصيل / الملاحظات</label>
-                        <textarea 
-                            rows="3"
-                            value={editingSaleData.details} 
-                            onChange={(e) => setEditingSaleData({...editingSaleData, details: e.target.value})} 
-                            className="w-full p-3 rounded bg-gray-700 text-white border border-gray-500 focus:border-blue-500 outline-none" 
-                        />
+                        <textarea rows="3" value={editingSaleData.details} onChange={(e) => setEditingSaleData({...editingSaleData, details: e.target.value})} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-500 focus:border-blue-500 outline-none" />
                     </div>
                 </div>
-
                 <div className="flex gap-3 mt-8">
                     <button onClick={() => setIsEditModalOpen(false)} className="flex-1 py-2 bg-gray-600 text-white rounded hover:bg-gray-500 transition">إلغاء</button>
                     <button onClick={handleSaveEdit} className="flex-1 py-2 bg-blue-600 text-white font-bold rounded hover:bg-blue-500 shadow-lg transition transform hover:scale-105">حفظ التعديلات ✅</button>
