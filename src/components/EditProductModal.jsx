@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
-import imageCompression from 'browser-image-compression'; // 🆕 استدعاء مكتبة الضغط
+import imageCompression from 'browser-image-compression';
 
 export default function EditProductModal({ product, onClose, onUpdate }) {
   const [sizes, setSizes] = useState([]);
@@ -17,7 +17,7 @@ export default function EditProductModal({ product, onClose, onUpdate }) {
   });
   
   const [loading, setLoading] = useState(false);
-  const [uploadingImage, setUploadingImage] = useState(false); // 🆕 حالة لرفع الصورة
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
@@ -33,7 +33,56 @@ export default function EditProductModal({ product, onClose, onUpdate }) {
     setFormData({ ...formData, [e.target.name]: value });
   };
 
-  // 🆕 --- دالة ضغط ورفع الصورة ---
+  // دالة حذف الصورة من السيرفر
+  const deleteOldImage = async (oldUrl) => {
+      if (!oldUrl || !oldUrl.includes('supabase.co')) return false; 
+
+      try {
+          const parts = oldUrl.split('/public/products/');
+          if (parts.length > 1) {
+              const fileName = parts[1].split('?')[0]; 
+              console.log('🔍 جاري الحذف:', fileName); 
+              
+              const { error } = await supabase.storage.from('products').remove([fileName]);
+              
+              if (error) {
+                  console.error('❌ خطأ من سيرفر Supabase:', error);
+                  return false;
+              } else {
+                  console.log('🗑️ تم الحذف بنجاح!');
+                  return true;
+              }
+          }
+      } catch (err) {
+          console.error('⚠️ تعذر الحذف:', err);
+          return false;
+      }
+      return false;
+  };
+
+  // 🆕 دالة زر الحذف اليدوي
+  const handleDeleteImageClick = async () => {
+      if (!formData.image_url) return;
+      
+      if (!window.confirm("هل أنت متأكد من حذف هذه الصورة نهائياً؟")) return;
+
+      setUploadingImage(true);
+      setMessage('⏳ جاري حذف الصورة...');
+
+      const success = await deleteOldImage(formData.image_url);
+      
+      if (success) {
+          setFormData(prev => ({ ...prev, image_url: '' })); // تفريغ الحقل
+          setMessage('🗑️ تم حذف الصورة بنجاح!');
+      } else {
+          setMessage('⚠️ حدثت مشكلة، قد تكون الصورة غير موجودة أصلاً بالسيرفر ولكن تم تفريغ الرابط.');
+          setFormData(prev => ({ ...prev, image_url: '' })); 
+      }
+      
+      setUploadingImage(false);
+  };
+
+  // --- دالة ضغط ورفع الصورة ---
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -42,21 +91,23 @@ export default function EditProductModal({ product, onClose, onUpdate }) {
     setMessage('⏳ جاري ضغط ورفع الصورة...');
 
     try {
-      // 1. إعدادات الضغط
       const options = {
-        maxSizeMB: 0.2, // أقصى حجم 200 كيلوبايت
-        maxWidthOrHeight: 1200, // أقصى عرض
-        useWebWorker: true,
-        fileType: 'image/webp' // التحويل القسري لـ webp
+        maxSizeMB: 0.5, 
+        maxWidthOrHeight: 1024, 
+        useWebWorker: false, 
+        fileType: 'image/webp',
+        initialQuality: 0.85
       };
 
-      // 2. ضغط الصورة في المتصفح
       const compressedFile = await imageCompression(file, options);
-      
-      // 3. توليد اسم فريد
       const fileName = `product_${Date.now()}.webp`;
 
-      // 4. الرفع إلى باكت products في Supabase
+      // 1. حذف الصورة القديمة قبل رفع الجديدة (إن وجدت)
+      if (formData.image_url) {
+          await deleteOldImage(formData.image_url);
+      }
+
+      // 2. رفع الصورة الجديدة
       const { data, error } = await supabase.storage
         .from('products')
         .upload(fileName, compressedFile, {
@@ -66,14 +117,14 @@ export default function EditProductModal({ product, onClose, onUpdate }) {
 
       if (error) throw error;
 
-      // 5. جلب الرابط العام للصورة الجديدة
+      // 3. جلب الرابط الجديد
       const { data: publicUrlData } = supabase.storage
         .from('products')
         .getPublicUrl(data.path);
 
-      // 6. تحديث الاستمارة بالرابط الجديد
+      // 4. تحديث الاستمارة بالرابط الجديد
       setFormData(prev => ({ ...prev, image_url: publicUrlData.publicUrl }));
-      setMessage('✅ تم تحديث الصورة بنجاح!');
+      setMessage('✅ تم رفع الصورة بنجاح!');
 
     } catch (error) {
       console.error("Image upload error:", error);
@@ -88,7 +139,6 @@ export default function EditProductModal({ product, onClose, onUpdate }) {
     setLoading(true);
 
     try {
-      // تجهيز كائن التحديث
       const updates = {
           name: formData.name,
           price: parseInt(formData.price), 
@@ -99,7 +149,6 @@ export default function EditProductModal({ product, onClose, onUpdate }) {
           ...(product.table === 'screens' && { specs: formData.specs }) 
       };
 
-      // إرسال التحديث لـ Supabase
       const { error } = await supabase
         .from(product.table) 
         .update(updates)
@@ -156,14 +205,22 @@ export default function EditProductModal({ product, onClose, onUpdate }) {
              <p className="text-xs text-gray-400 mt-2 mr-8">تفعيل هذا الخيار سيقوم بفك ارتباط المنتج بالسيارة الحالية ويجعله يظهر لكل السيارات التي تدعم هذا المقاس.</p>
           </div>
 
-          {/* 🆕 قسم تعديل الصورة */}
+          {/* قسم تعديل الصورة */}
           <div className="bg-gray-900/50 p-4 rounded border border-gray-600 space-y-3">
               <label className="text-gray-300 font-bold text-sm block">صورة المنتج</label>
               
-              {/* عرض الصورة الحالية إن وجدت */}
+              {/* 🆕 عرض الصورة الحالية + زر الحذف المباشر */}
               {formData.image_url && (
-                  <div className="flex justify-center mb-2">
-                      <img src={formData.image_url} alt="Current Product" className="h-24 rounded border border-gray-500 shadow-md object-cover" />
+                  <div className="flex flex-col items-center mb-4 space-y-2 bg-gray-800 p-2 rounded border border-gray-700">
+                      <img src={formData.image_url} alt="Current Product" className="h-28 rounded shadow-md object-cover" />
+                      <button 
+                          type="button" 
+                          onClick={handleDeleteImageClick}
+                          disabled={uploadingImage}
+                          className="bg-red-600/80 hover:bg-red-500 text-white text-xs px-4 py-1.5 rounded-full shadow transition"
+                      >
+                          🗑️ حذف الصورة نهائياً
+                      </button>
                   </div>
               )}
 
@@ -177,7 +234,7 @@ export default function EditProductModal({ product, onClose, onUpdate }) {
                           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                       />
                       <div className={`w-full px-4 py-2 rounded font-bold text-sm text-center transition border border-dashed ${uploadingImage ? 'border-gray-500 bg-gray-700 text-gray-400' : 'border-blue-500 bg-blue-900/30 text-blue-300 hover:bg-blue-800/50'}`}>
-                          {uploadingImage ? 'جاري الرفع...' : '📂 رفع صورة جديدة'}
+                          {uploadingImage ? 'جاري المعالجة...' : formData.image_url ? '🔄 رفع صورة بديلة' : '📂 رفع صورة للمنتج'}
                       </div>
                   </div>
               </div>
@@ -189,9 +246,8 @@ export default function EditProductModal({ product, onClose, onUpdate }) {
                   className="w-full p-2 text-xs rounded bg-gray-800 text-gray-400 border border-gray-600 outline-none text-left" dir="ltr" 
               />
               
-              {/* رسالة الرفع */}
               {message && (
-                  <div className={`text-xs text-center mt-1 ${message.includes('❌') ? 'text-red-400' : 'text-green-400'}`}>
+                  <div className={`text-xs text-center mt-1 ${message.includes('❌') || message.includes('⚠️') ? 'text-red-400' : 'text-green-400'}`}>
                       {message}
                   </div>
               )}

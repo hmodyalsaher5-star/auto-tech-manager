@@ -15,12 +15,12 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 // import App from './App.jsx'  <-- قم بتعليق هذا السطر
-import SalesMain from './components/Sales/SalesMain.jsx' // <-- استدعِ ملفنا الجديد
+import DeliveryMain from './components/DeliverySystem/DeliveryMain.jsx' // <-- استدعِ ملفنا الجديد
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <SalesMain /> 
+    <DeliveryMain /> 
   </React.StrictMode>,
 ) 
 */
