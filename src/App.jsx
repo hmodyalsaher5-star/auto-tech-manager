@@ -42,7 +42,7 @@ function App() {
   const [showCashierPanel, setShowCashierPanel] = useState(false);
   const [showSalesEntry, setShowSalesEntry] = useState(false);
   
-  // ✅ حالة جديدة: زر البحث الصريح (للمخزن وغيرهم)
+  // حالة جديدة: زر البحث الصريح (للمخزن وغيرهم)
   const [showSearchPanel, setShowSearchPanel] = useState(false);
 
   useEffect(() => {
@@ -79,7 +79,7 @@ function App() {
       setShowWarehousePanel(false); setShowCatalogPanel(false);
       setShowAccountsDashboard(false); setShowTechnicianPayout(false); setShowDailyReport(false);
       setShowCashierPanel(false); setShowSalesEntry(false);
-      setShowAdminReview(false); setShowSearchPanel(false); // ✅
+      setShowAdminReview(false); setShowSearchPanel(false);
   };
 
   const togglePanel = (panelName) => {
@@ -92,11 +92,10 @@ function App() {
       if (panelName === 'accounts') setShowAccountsDashboard(true);
       if (panelName === 'cashier') setShowCashierPanel(true); 
       if (panelName === 'salesEntry') setShowSalesEntry(true);
-      if (panelName === 'search') setShowSearchPanel(true); // ✅ تفعيل البحث
+      if (panelName === 'search') setShowSearchPanel(true); 
   };
 
-  // دوال التنقل
-// ✅ التنقل داخل الحسابات
+  // التنقل داخل الحسابات
   const handleAccountNavigation = (target) => {
       setShowAccountsDashboard(false);
       
@@ -104,7 +103,6 @@ function App() {
       if (target === 'dailyReport') setShowDailyReport(true);
       if (target === 'review') setShowAdminReview(true);
       
-      // 👇 هذا السطر ضروري جداً لكي يعمل زر الكاشير الجديد 👇
       if (target === 'cashier') setShowCashierPanel(true); 
   };
 
@@ -115,10 +113,11 @@ function App() {
 
   const handleBackToHome = () => { closeAllPanels(); };
 
+  // ✅ للتحقق مما إذا كان المستخدم يقف في الشاشة الرئيسية (لإضاءة زر الرئيسية)
+  const isHomeActive = showSearchPanel || (!showCatalogPanel && !showWarehousePanel && !showMasterDataPanel && !showAdminPanel && !showUserPanel && !showAccountsDashboard && !showCashierPanel && !showSalesEntry);
+
   if (authLoading) return <div className="min-h-screen bg-gray-900 flex justify-center items-center text-white">جاري التحقق... 🔐</div>;
   if (!session) return (<div className="bg-gray-900 min-h-screen flex flex-col justify-center items-center p-4"><h1 className="text-4xl font-bold text-yellow-500 mb-2">نظام إدارة المخزون 🚗</h1><div className="w-full max-w-md bg-gray-800 p-1 rounded-lg shadow-2xl"><Login onClose={() => {}} /></div></div>);
-
-  // ❌ تم إزالة "if return" الخاص بالمخزن ليدخلوا ضمن الهيكل العام
 
   // --- الواجهة الرئيسية ---
   return (
@@ -137,8 +136,8 @@ function App() {
               <Header />
               <div className="bg-gray-800 border-b border-gray-700 p-3 flex justify-between items-center px-6 shadow-md">
                  <div className="flex items-center gap-3">
-                    <div className={`w-3 h-3 rounded-full ${userRole === 'admin' ? 'bg-red-500' : userRole.includes('warehouse') ? 'bg-orange-500' : 'bg-blue-500'}`}></div>
-                    <div><p className="text-sm font-bold text-white">{session.user.email}</p><p className="text-xs text-gray-400">الدور: <span className="uppercase font-bold text-yellow-400">{userRole}</span></p></div>
+                    <div className={`w-3 h-3 rounded-full ${userRole === 'admin' ? 'bg-red-500' : userRole === 'viewer' ? 'bg-green-500' : userRole.includes('warehouse') ? 'bg-orange-500' : 'bg-blue-500'}`}></div>
+                    <div><p className="text-sm font-bold text-white">{session.user.email}</p><p className="text-xs text-gray-400">الدور: <span className="uppercase font-bold text-yellow-400">{userRole === 'viewer' ? 'زائر' : userRole}</span></p></div>
                  </div>
                  <button onClick={handleLogout} className="text-red-400 text-sm hover:text-red-300 font-bold underline transition">تسجيل خروج ⬅️</button>
               </div>
@@ -146,7 +145,12 @@ function App() {
               {/* 🕹️ شريط الأزرار */}
               <div className="container mx-auto p-4 mt-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
                 
-            {/* 👑 أزرار المدير */}
+                {/* ✅✅ التعديل هنا: زر الرئيسية (البحث بالسيارة) يظهر للجميع كأول زر دائم ✅✅ */}
+                <button onClick={() => togglePanel('search')} className={`p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${isHomeActive ? 'bg-teal-700 border-teal-500 ring-2 ring-teal-400' : 'bg-teal-800 border-teal-600 hover:bg-teal-700'}`}>
+                    <span className="text-2xl">🏠</span><span>الرئيسية / بحث</span>
+                </button>
+
+                {/* 👑 أزرار المدير */}
                 {userRole === 'admin' && (
                     <>
                         <button onClick={() => togglePanel('accounts')} className={`p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${showAccountsDashboard ? 'bg-yellow-700 border-yellow-500 ring-2 ring-yellow-400' : 'bg-yellow-800 border-yellow-700 hover:bg-yellow-700'}`}>
@@ -161,10 +165,6 @@ function App() {
                             <span className="text-2xl">📦</span><span>إضافة منتج</span>
                         </button>
 
-                        <button onClick={() => togglePanel('warehouse')} className={`p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${showWarehousePanel ? 'bg-orange-800 border-orange-500 ring-2 ring-orange-400' : 'bg-orange-900 border-orange-800 hover:bg-orange-800'}`}>
-                            <span className="text-2xl">🏭</span><span>المخزن</span>
-                        </button>
-
                         <button onClick={() => togglePanel('master')} className={`p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${showMasterDataPanel ? 'bg-emerald-800 border-emerald-500 ring-2 ring-emerald-400' : 'bg-emerald-900 border-emerald-800 hover:bg-emerald-800'}`}>
                             <span className="text-2xl">🚗</span><span>السيارات</span>
                         </button>
@@ -173,23 +173,24 @@ function App() {
 
                 {/* 🏭 أزرار المخزن (للمدير وعمال المخزن والمشرفين) */}
                 {(userRole === 'admin' || userRole.includes('warehouse')) && (
-                    <>
-                        <button onClick={() => togglePanel('warehouse')} className={`p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${showWarehousePanel ? 'bg-orange-800 border-orange-500 ring-2 ring-orange-400' : 'bg-orange-900 border-orange-800 hover:bg-orange-800'}`}>
-                            <span className="text-2xl">🏭</span><span>إدارة المخزن</span>
-                        </button>
-                        {/* ✅ زر البحث المخصص للمخزن */}
-                        <button onClick={() => togglePanel('search')} className={`p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${showSearchPanel ? 'bg-teal-700 border-teal-500 ring-2 ring-teal-400' : 'bg-teal-800 border-teal-600 hover:bg-teal-700'}`}>
-                            <span className="text-2xl">🔍</span><span>بحث عن المنتجات</span>
-                        </button>
-                    </>
+                    <button onClick={() => togglePanel('warehouse')} className={`p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${showWarehousePanel ? 'bg-orange-800 border-orange-500 ring-2 ring-orange-400' : 'bg-orange-900 border-orange-800 hover:bg-orange-800'}`}>
+                        <span className="text-2xl">🏭</span><span>إدارة المخزن</span>
+                    </button>
+                    // ❌ تم إزالة زر البحث من هنا لأنه أصبح في الأعلى للجميع ❌
                 )}
 
-                {/* 🛒 المبيعات والكتالوج (للمشرف والمبيعات) */}
-                {(userRole === 'admin' || userRole === 'supervisor' || userRole === 'sales') && (
+                {/* 🛒 المبيعات والكتالوج (للمشرف والمبيعات والزائر) */}
+                {(userRole === 'admin' || userRole === 'supervisor' || userRole === 'sales' || userRole === 'viewer') && (
                     <>
-                        <button onClick={() => togglePanel('salesEntry')} className={`p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${showSalesEntry ? 'bg-purple-700 border-purple-500 ring-2 ring-purple-400' : 'bg-purple-800 border-purple-600 hover:bg-purple-700'}`}><span className="text-2xl">📝</span><span>تسجيل بيع</span></button>
+                        {/* زر تسجيل البيع مخفي عن الزائر */}
+                        {userRole !== 'viewer' && (
+                            <button onClick={() => togglePanel('salesEntry')} className={`p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${showSalesEntry ? 'bg-purple-700 border-purple-500 ring-2 ring-purple-400' : 'bg-purple-800 border-purple-600 hover:bg-purple-700'}`}><span className="text-2xl">📝</span><span>تسجيل بيع</span></button>
+                        )}
+                        
+                        {/* زر الكتالوج يظهر للجميع (بما فيهم الزائر) */}
                         <button onClick={() => togglePanel('catalog')} className={`p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${showCatalogPanel ? 'bg-cyan-800 border-cyan-500 ring-2 ring-cyan-400' : 'bg-cyan-900 border-cyan-800 hover:bg-cyan-800'}`}><span className="text-2xl">📋</span><span>الكتالوج</span></button>
-                        {/* زر إضافة منتج للمشرف فقط (لأن المدير لديه زر خاص فوق) */}
+                        
+                        {/* زر إضافة منتج للمشرف فقط */}
                         {userRole === 'supervisor' && <button onClick={() => togglePanel('admin')} className={`p-3 rounded-lg text-center text-sm font-bold border transition flex flex-col items-center justify-center gap-1 shadow-md active:scale-95 ${showAdminPanel ? 'bg-blue-800 border-blue-500 ring-2 ring-blue-400' : 'bg-blue-900 border-blue-800 hover:bg-blue-800'}`}><span className="text-2xl">📦</span><span>إضافة منتج</span></button>}
                     </>
                 )}
@@ -203,16 +204,12 @@ function App() {
               {/* العرض (Panels) */}
               {showAdminPanel && <div className="container mx-auto px-4 md:px-8 mb-8 border-b border-gray-700 pb-8 animate-fadeIn"><AddProductForm /></div>}
               {showCatalogPanel && <div className="container mx-auto px-4 md:px-8 mb-8 border-b border-gray-700 pb-8 animate-fadeIn"><ProductCatalog userRole={userRole} sizes={sizes} /></div>}
-              {/* ✅ عرض المخزن للمدير ولموظفي المخزن */}
               {showWarehousePanel && (userRole === 'admin' || userRole.includes('warehouse')) && <div className="container mx-auto px-2 mb-8 border-b border-gray-700 pb-8 animate-fadeIn"><WarehouseManagement userRole={userRole} /></div>}
               {showMasterDataPanel && <div className="container mx-auto px-4 md:px-8 mb-8 border-b border-gray-700 pb-8 animate-fadeIn"><MasterDataManagement /></div>}
               {showUserPanel && <div className="container mx-auto px-4 md:px-8 mb-8 border-b border-gray-700 pb-8 animate-fadeIn"><UserManagement /></div>}
 
-              {/* ✅✅ مكون البحث عن المنتجات (يظهر في حالتين) ✅✅ */}
-              {/* 1. يظهر بشكل افتراضي إذا لم يتم فتح أي لوحة (للمدير والمبيعات) */}
-              {/* 2. يظهر إذا تم الضغط على زر "بحث" (للمخزن) */}
-              {
-                (showSearchPanel || (!showCatalogPanel && !showWarehousePanel && !showMasterDataPanel && !showAdminPanel && !showUserPanel && !showAccountsDashboard && !showCashierPanel && !showSalesEntry && !showTechnicianPayout && !showDailyReport && !showAdminReview && !userRole.includes('warehouse'))) && (
+              {/* مكون البحث عن المنتجات (الرئيسية) */}
+              { isHomeActive && (
                   <ProductSearch userRole={userRole} sizes={sizes} />
               )}
 
