@@ -60,7 +60,7 @@ export default function EditProductModal({ product, onClose, onUpdate }) {
       return false;
   };
 
-  // 🆕 دالة زر الحذف اليدوي
+  // دالة زر الحذف اليدوي
   const handleDeleteImageClick = async () => {
       if (!formData.image_url) return;
       
@@ -72,7 +72,7 @@ export default function EditProductModal({ product, onClose, onUpdate }) {
       const success = await deleteOldImage(formData.image_url);
       
       if (success) {
-          setFormData(prev => ({ ...prev, image_url: '' })); // تفريغ الحقل
+          setFormData(prev => ({ ...prev, image_url: '' })); 
           setMessage('🗑️ تم حذف الصورة بنجاح!');
       } else {
           setMessage('⚠️ حدثت مشكلة، قد تكون الصورة غير موجودة أصلاً بالسيرفر ولكن تم تفريغ الرابط.');
@@ -139,14 +139,15 @@ export default function EditProductModal({ product, onClose, onUpdate }) {
     setLoading(true);
 
     try {
+      // ✅ التعديل الأهم هنا: لا نرسل size_id إذا كان الجدول accessories
       const updates = {
           name: formData.name,
           price: parseInt(formData.price), 
           currency: formData.currency,
           image_url: formData.image_url,
-          size_id: formData.size_id ? parseInt(formData.size_id) : null,
           generation_id: formData.is_universal ? null : product.generation_id,
-          ...(product.table === 'screens' && { specs: formData.specs }) 
+          ...(product.table !== 'accessories' && { size_id: formData.size_id ? parseInt(formData.size_id) : null }),
+          ...((product.table === 'screens' || product.table === 'accessories') && { specs: formData.specs }) 
       };
 
       const { error } = await supabase
@@ -189,27 +190,29 @@ export default function EditProductModal({ product, onClose, onUpdate }) {
             </div>
           </div>
 
-          <div>
-            <label className="text-gray-400 text-sm block mb-1">📏 مقاس المنتج</label>
-            <select name="size_id" value={formData.size_id} onChange={handleChange} className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 focus:border-blue-500 outline-none">
-                <option value="">-- اختر المقاس --</option>
-                {sizes.map(size => <option key={size.id} value={size.id}>{size.size_name}</option>)}
-            </select>
-          </div>
+          {/* ✅ إخفاء حقل المقاس عن الإكسسوارات */}
+          {product.table !== 'accessories' && (
+            <div>
+              <label className="text-gray-400 text-sm block mb-1">📏 مقاس المنتج</label>
+              <select name="size_id" value={formData.size_id} onChange={handleChange} className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 focus:border-blue-500 outline-none">
+                  <option value="">-- اختر المقاس --</option>
+                  {sizes.map(size => <option key={size.id} value={size.id}>{size.size_name}</option>)}
+              </select>
+            </div>
+          )}
 
           <div className="bg-gray-700/50 p-3 rounded border border-gray-600">
              <label className="flex items-center gap-3 cursor-pointer">
                 <input type="checkbox" name="is_universal" checked={formData.is_universal} onChange={handleChange} className="w-5 h-5 rounded border-gray-500 text-blue-600 focus:ring-blue-500" />
                 <span className="text-white font-bold">جعل المنتج "عام" (يونيفرسال) 🌍</span>
              </label>
-             <p className="text-xs text-gray-400 mt-2 mr-8">تفعيل هذا الخيار سيقوم بفك ارتباط المنتج بالسيارة الحالية ويجعله يظهر لكل السيارات التي تدعم هذا المقاس.</p>
+             <p className="text-xs text-gray-400 mt-2 mr-8">تفعيل هذا الخيار سيقوم بفك ارتباط المنتج بالسيارة الحالية ويجعله يظهر لكل السيارات.</p>
           </div>
 
           {/* قسم تعديل الصورة */}
           <div className="bg-gray-900/50 p-4 rounded border border-gray-600 space-y-3">
               <label className="text-gray-300 font-bold text-sm block">صورة المنتج</label>
               
-              {/* 🆕 عرض الصورة الحالية + زر الحذف المباشر */}
               {formData.image_url && (
                   <div className="flex flex-col items-center mb-4 space-y-2 bg-gray-800 p-2 rounded border border-gray-700">
                       <img src={formData.image_url} alt="Current Product" className="h-28 rounded shadow-md object-cover" />
@@ -253,7 +256,8 @@ export default function EditProductModal({ product, onClose, onUpdate }) {
               )}
           </div>
 
-          {product.table === 'screens' && (
+          {/* ✅ إظهار حقل المواصفات للشاشات والإكسسوارات */}
+          {(product.table === 'screens' || product.table === 'accessories') && (
             <div>
               <label className="text-gray-400 text-sm block mb-1">المواصفات</label>
               <textarea name="specs" value={formData.specs} onChange={handleChange} className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 focus:border-purple-500 outline-none" rows="3" />
