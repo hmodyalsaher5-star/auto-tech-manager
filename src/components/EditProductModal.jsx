@@ -168,106 +168,147 @@ export default function EditProductModal({ product, onClose, onUpdate }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4 animate-fadeIn">
-      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md border border-gray-600 shadow-2xl overflow-y-auto max-h-[90vh] dir-rtl text-right">
-        <h2 className="text-xl font-bold text-yellow-400 mb-4 text-center border-b border-gray-700 pb-2">✏️ تعديل المنتج</h2>
+    // 🎨 خلفية زجاجية معتمة
+    <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex justify-center items-center p-4 animate-fadeIn dir-rtl text-right">
+      
+      {/* 🎨 صندوق النافذة الزجاجي المتناسق */}
+      <div className="bg-white/5 backdrop-blur-xl rounded-[2rem] p-6 md:p-8 w-full max-w-md border border-white/10 shadow-[0_15px_40px_rgba(0,0,0,0.6)] overflow-y-auto max-h-[90vh] relative">
         
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* توهج داخلي للنافذة */}
+        <div className="absolute top-0 right-0 w-40 h-40 bg-amber-500/10 blur-[60px] pointer-events-none"></div>
+
+        <h2 className="text-xl md:text-2xl font-black text-amber-400 mb-6 border-b border-white/10 pb-4 text-center drop-shadow-md relative z-10">
+          ✏️ تعديل بيانات المنتج
+        </h2>
+        
+        <form onSubmit={handleSubmit} className="space-y-5 relative z-10">
           
           <div>
-            <label className="text-gray-400 text-sm block mb-1">اسم المنتج</label>
-            <input type="text" name="name" value={formData.name} onChange={handleChange} required className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 focus:border-blue-500 outline-none" />
+            <label className="text-orange-200/70 text-sm font-bold mb-1 block">اسم المنتج</label>
+            <input 
+              type="text" name="name" value={formData.name} onChange={handleChange} required 
+              className="w-full p-3 rounded-xl bg-black/40 border border-white/10 text-orange-50 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 outline-none transition-all shadow-inner" 
+            />
           </div>
 
           <div>
-            <label className="text-gray-400 text-sm block mb-1">السعر والعملة</label>
+            <label className="text-orange-200/70 text-sm font-bold mb-1 block">السعر والعملة</label>
             <div className="flex gap-2">
-                <input type="number" name="price" value={formData.price} onChange={handleChange} required className="flex-grow p-2 rounded bg-gray-700 text-white border border-gray-600 focus:border-blue-500 outline-none" />
-                <select name="currency" value={formData.currency} onChange={handleChange} className="w-1/3 p-2 rounded bg-gray-700 text-white border border-gray-600 font-bold text-center focus:border-blue-500 outline-none">
-                    <option value="USD">دولار ($)</option>
-                    <option value="IQD">دينار (د.ع)</option>
+                <input 
+                  type="number" name="price" value={formData.price} onChange={handleChange} required 
+                  className="flex-grow p-3 rounded-xl bg-black/40 border border-white/10 text-orange-50 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 outline-none transition-all shadow-inner text-left dir-ltr" 
+                />
+                <select 
+                  name="currency" value={formData.currency} onChange={handleChange} 
+                  className="w-1/3 p-3 rounded-xl bg-black/40 border border-white/10 text-orange-50 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 outline-none transition-all shadow-inner font-bold text-center appearance-none cursor-pointer"
+                >
+                    <option value="USD" className="bg-gray-900">دولار ($)</option>
+                    <option value="IQD" className="bg-gray-900">دينار (د.ع)</option>
                 </select>
             </div>
           </div>
 
-          {/* ✅ إخفاء حقل المقاس عن الإكسسوارات */}
           {product.table !== 'accessories' && (
             <div>
-              <label className="text-gray-400 text-sm block mb-1">📏 مقاس المنتج</label>
-              <select name="size_id" value={formData.size_id} onChange={handleChange} className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 focus:border-blue-500 outline-none">
-                  <option value="">-- اختر المقاس --</option>
-                  {sizes.map(size => <option key={size.id} value={size.id}>{size.size_name}</option>)}
+              <label className="text-orange-200/70 text-sm font-bold mb-1 block">📏 مقاس المنتج</label>
+              <select 
+                name="size_id" value={formData.size_id} onChange={handleChange} 
+                className="w-full p-3 rounded-xl bg-black/40 border border-white/10 text-orange-50 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 outline-none transition-all shadow-inner appearance-none cursor-pointer"
+              >
+                  <option value="" className="bg-gray-900">-- اختر المقاس --</option>
+                  {sizes.map(size => <option key={size.id} value={size.id} className="bg-gray-900">{size.size_name}</option>)}
               </select>
             </div>
           )}
 
-          <div className="bg-gray-700/50 p-3 rounded border border-gray-600">
-             <label className="flex items-center gap-3 cursor-pointer">
-                <input type="checkbox" name="is_universal" checked={formData.is_universal} onChange={handleChange} className="w-5 h-5 rounded border-gray-500 text-blue-600 focus:ring-blue-500" />
-                <span className="text-white font-bold">جعل المنتج "عام" (يونيفرسال) 🌍</span>
+          {/* 🎨 تنسيق خيار المنتج العام */}
+          <div className="bg-black/30 p-4 rounded-xl border border-white/10 shadow-inner">
+             <label className="flex items-center gap-3 cursor-pointer group">
+                <input 
+                  type="checkbox" name="is_universal" checked={formData.is_universal} onChange={handleChange} 
+                  className="w-5 h-5 rounded bg-black/50 border-white/20 text-amber-500 focus:ring-amber-500/50 focus:ring-offset-0 cursor-pointer" 
+                />
+                <span className="text-amber-300 font-bold group-hover:text-amber-200 transition-colors">جعل المنتج "عام" (يونيفرسال) 🌍</span>
              </label>
-             <p className="text-xs text-gray-400 mt-2 mr-8">تفعيل هذا الخيار سيقوم بفك ارتباط المنتج بالسيارة الحالية ويجعله يظهر لكل السيارات.</p>
+             <p className="text-xs text-orange-200/50 mt-2 mr-8 leading-relaxed">تفعيل هذا الخيار سيقوم بفك ارتباط المنتج بالسيارة الحالية ويجعله يظهر لكل السيارات.</p>
           </div>
 
-          {/* قسم تعديل الصورة */}
-          <div className="bg-gray-900/50 p-4 rounded border border-gray-600 space-y-3">
-              <label className="text-gray-300 font-bold text-sm block">صورة المنتج</label>
+          {/* 🎨 قسم تعديل الصورة */}
+          <div className="bg-black/30 p-5 rounded-2xl border border-white/10 space-y-4 shadow-inner">
+              <label className="text-amber-400 font-bold text-sm block">صورة المنتج</label>
               
               {formData.image_url && (
-                  <div className="flex flex-col items-center mb-4 space-y-2 bg-gray-800 p-2 rounded border border-gray-700">
-                      <img src={formData.image_url} alt="Current Product" className="h-28 rounded shadow-md object-cover" />
+                  <div className="flex flex-col items-center space-y-3 bg-white/5 p-3 rounded-xl border border-white/10">
+                      <img src={formData.image_url} alt="Current Product" className="h-32 rounded-lg shadow-lg object-cover" />
                       <button 
                           type="button" 
                           onClick={handleDeleteImageClick}
                           disabled={uploadingImage}
-                          className="bg-red-600/80 hover:bg-red-500 text-white text-xs px-4 py-1.5 rounded-full shadow transition"
+                          className="bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs px-5 py-2 rounded-full shadow-lg transition-all active:scale-95 font-bold"
                       >
                           🗑️ حذف الصورة نهائياً
                       </button>
                   </div>
               )}
 
-              <div className="flex items-center gap-3">
-                  <div className="relative flex-grow">
-                      <input 
-                          type="file" 
-                          accept="image/*" 
-                          onChange={handleImageUpload}
-                          disabled={uploadingImage}
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      />
-                      <div className={`w-full px-4 py-2 rounded font-bold text-sm text-center transition border border-dashed ${uploadingImage ? 'border-gray-500 bg-gray-700 text-gray-400' : 'border-blue-500 bg-blue-900/30 text-blue-300 hover:bg-blue-800/50'}`}>
-                          {uploadingImage ? 'جاري المعالجة...' : formData.image_url ? '🔄 رفع صورة بديلة' : '📂 رفع صورة للمنتج'}
-                      </div>
+              <div className="relative w-full">
+                  <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleImageUpload}
+                      disabled={uploadingImage}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  />
+                  <div className={`w-full px-4 py-3 rounded-xl font-bold text-sm text-center transition-all border border-dashed flex items-center justify-center gap-2 ${uploadingImage ? 'border-gray-500 bg-gray-800 text-gray-400' : 'border-amber-500/50 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.1)]'}`}>
+                      {uploadingImage ? '⏳ جاري المعالجة...' : formData.image_url ? '🔄 رفع صورة بديلة' : '📂 اضغط هنا لرفع صورة'}
                   </div>
               </div>
 
               <input 
                   type="text" name="image_url" 
                   value={formData.image_url} onChange={handleChange} 
-                  placeholder="الرابط اليدوي للصورة..."
-                  className="w-full p-2 text-xs rounded bg-gray-800 text-gray-400 border border-gray-600 outline-none text-left" dir="ltr" 
+                  placeholder="أو ضع الرابط اليدوي للصورة هنا..."
+                  className="w-full p-2.5 text-xs rounded-xl bg-black/50 text-orange-200/60 border border-white/10 outline-none focus:border-amber-500/30 text-left transition-colors" dir="ltr" 
               />
               
               {message && (
-                  <div className={`text-xs text-center mt-1 ${message.includes('❌') || message.includes('⚠️') ? 'text-red-400' : 'text-green-400'}`}>
+                  <div className={`text-xs text-center mt-2 font-bold p-2 rounded-lg bg-black/40 ${message.includes('❌') || message.includes('⚠️') ? 'text-rose-400 border border-rose-500/20' : 'text-emerald-400 border border-emerald-500/20'}`}>
                       {message}
                   </div>
               )}
           </div>
 
-          {/* ✅ إظهار حقل المواصفات للشاشات والإكسسوارات */}
           {(product.table === 'screens' || product.table === 'accessories') && (
             <div>
-              <label className="text-gray-400 text-sm block mb-1">المواصفات</label>
-              <textarea name="specs" value={formData.specs} onChange={handleChange} className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 focus:border-purple-500 outline-none" rows="3" />
+              <label className="text-orange-200/70 text-sm font-bold mb-1 block">المواصفات</label>
+              <textarea 
+                name="specs" value={formData.specs} onChange={handleChange} 
+                className="w-full p-3 rounded-xl bg-black/40 border border-white/10 text-orange-50 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 outline-none transition-all shadow-inner" 
+                rows="3" 
+              />
             </div>
           )}
 
-          <div className="flex gap-3 mt-6">
-            <button type="button" onClick={onClose} disabled={uploadingImage} className="flex-1 py-3 bg-gray-600 hover:bg-gray-500 rounded text-white transition font-bold">إلغاء</button>
-            <button type="submit" disabled={loading || uploadingImage} className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 rounded text-white font-bold transition shadow-lg">{loading ? 'جاري الحفظ...' : 'حفظ التعديلات ✅'}</button>
+          {/* 🎨 أزرار التحكم */}
+          <div className="flex gap-3 mt-8 pt-2">
+            <button 
+              type="submit" 
+              disabled={loading || uploadingImage} 
+              className="flex-1 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-300 py-3 rounded-2xl font-bold shadow-[0_0_15px_rgba(245,158,11,0.2)] transition-all active:scale-95 flex justify-center items-center"
+            >
+              {loading ? 'جاري الحفظ... ⏳' : 'حفظ التعديلات ✔️'}
+            </button>
+
+            <button 
+              type="button" 
+              onClick={onClose} 
+              disabled={uploadingImage} 
+              className="bg-white/5 hover:bg-white/10 border border-white/10 text-orange-50 px-6 py-3 rounded-2xl font-bold transition-all active:scale-95"
+            >
+              إلغاء ✖️
+            </button>
           </div>
+
         </form>
       </div>
     </div>

@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../supabase'
 
-// نستقبل خاصية onClose لإغلاق النافذة بدون ريفريش
 function Login({ onClose }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -11,7 +10,6 @@ function Login({ onClose }) {
     e.preventDefault();
     setLoading(true);
     
-    // الاتصال بـ Supabase
     const { error } = await supabase.auth.signInWithPassword({
       email: email,
       password: password,
@@ -21,56 +19,83 @@ function Login({ onClose }) {
       alert("❌ بيانات الدخول غير صحيحة!");
       setLoading(false);
     } else {
-      // ✅ نجاح! لا نحتاج لفعل شيء، App.jsx سيكتشف الدخول ويغلق النافذة تلقائياً
-      // لكن يمكننا استدعاء onClose للاحتياط
       if (onClose) onClose();
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-90 flex justify-center items-center z-50 p-4">
-      <div className="bg-gray-800 p-8 rounded-lg shadow-2xl border border-gray-600 w-full max-w-md relative">
+    // 1. عزل كامل: خلفية سوداء شبه قاتمة مع تغبيش قوي جداً لإخفاء ما خلفها
+    <div className="fixed inset-0 z-[9999] bg-black/95 backdrop-blur-3xl flex justify-center items-center p-4 dir-rtl text-right animate-fadeIn">
+      
+      {/* 2. بطاقة صلبة (Solid): استخدمنا لون داكن جداً بدون شفافية لمنع التداخل */}
+      <div className="bg-[#1a1a1a] p-8 md:p-10 rounded-[2rem] shadow-[0_0_50px_rgba(245,158,11,0.1)] border border-amber-500/20 w-full max-w-md relative overflow-hidden">
         
-        {/* زر إغلاق صغير في الزاوية */}
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white">✕</button>
+        {/* إضاءة داخلية ديكورية */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-[80px] pointer-events-none"></div>
 
-        <h2 className="text-2xl font-bold text-white mb-6 text-center">🔐 دخول المدير</h2>
+        <button 
+          onClick={onClose} 
+          className="absolute top-6 left-6 text-gray-500 hover:text-rose-400 transition-colors font-black text-xl relative z-10"
+          title="إغلاق"
+        >
+          ✕
+        </button>
+
+        <div className="text-center mb-8 relative z-10">
+            <div className="text-5xl mb-3 drop-shadow-lg">🔐</div>
+            <h2 className="text-2xl md:text-3xl font-black text-amber-400 drop-shadow-md">تسجيل الدخول</h2>
+            <p className="text-gray-400 text-sm mt-2 font-bold">يرجى إدخال بيانات الاعتماد الخاصة بك</p>
+        </div>
         
-        <form onSubmit={handleLogin} className="space-y-4">
-          <input
-            type="email"
-            placeholder="البريد الإلكتروني"
-            className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 focus:border-blue-500 outline-none"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
+        <form onSubmit={handleLogin} className="space-y-6 relative z-10">
           
-          <input
-            type="password"
-            placeholder="كلمة المرور"
-            className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 focus:border-blue-500 outline-none"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
+          <div>
+              <label className="text-amber-200/80 text-sm font-bold mb-2 block">البريد الإلكتروني</label>
+              {/* حقول إدخال صلبة (bg-black) بدون شفافية */}
+              <input
+                type="email"
+                dir="ltr"
+                placeholder="admin@example.com"
+                className="w-full p-4 rounded-xl bg-black text-white border border-gray-700 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all shadow-inner text-left placeholder:text-gray-600"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+          </div>
+          
+          <div>
+              <label className="text-amber-200/80 text-sm font-bold mb-2 block">كلمة المرور</label>
+              <input
+                type="password"
+                dir="ltr"
+                placeholder="••••••••"
+                className="w-full p-4 rounded-xl bg-black text-white border border-gray-700 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all shadow-inner text-left placeholder:text-gray-600 tracking-widest"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+          </div>
 
-          <button 
-            type="submit" 
-            disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded transition-colors"
-          >
-            {loading ? "جارٍ التحقق..." : "دخول"}
-          </button>
-          
-          <button
-            type="button"
-            onClick={onClose} // ✅ هنا التغيير: نغلق النافذة بدلاً من إعادة تحميل الصفحة
-            className="w-full text-gray-400 hover:text-white text-sm mt-2"
-          >
-            إلغاء والعودة كزائر
-          </button>
+          <div className="pt-4">
+              {/* زر ذهبي مشع وبارز */}
+              <button 
+                type="submit" 
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-black font-black py-4 rounded-2xl shadow-[0_0_20px_rgba(245,158,11,0.3)] transition-all active:scale-95 flex justify-center items-center gap-2"
+              >
+                {loading ? "جارٍ التحقق... ⏳" : "تسجيل الدخول 🚪"}
+              </button>
+              
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full text-gray-500 hover:text-white text-sm mt-5 font-bold transition-colors"
+              >
+                إلغاء والعودة كزائر
+              </button>
+          </div>
         </form>
+
       </div>
     </div>
   )
