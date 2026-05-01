@@ -10,7 +10,7 @@ export default function AccountsDashboard({ onNavigate, onBack }) {
             <h1 className="text-2xl md:text-3xl font-black text-amber-400 drop-shadow-md flex items-center gap-3">
               🔐 الإدارة المالية
             </h1>
-            <p className="text-orange-200/60 text-sm mt-2 font-bold">لوحة تحكم المدير العام</p>
+            <p className="text-orange-200/60 text-sm mt-2 font-bold">لوحة تحكم المدير العام / الحسابات</p>
         </div>
         <button 
           onClick={onBack} 
@@ -20,8 +20,8 @@ export default function AccountsDashboard({ onNavigate, onBack }) {
         </button>
       </div>
 
-      {/* 🎨 شبكة الأزرار (عمودين) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto relative z-10">
+      {/* 🎨 شبكة الأزرار (عدلناها لتستوعب 5 أزرار بشكل أنيق) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto relative z-10">
         
         {/* 1. زر المراجعة */}
         <div 
@@ -42,7 +42,7 @@ export default function AccountsDashboard({ onNavigate, onBack }) {
             <div className="absolute top-0 right-0 w-40 h-40 bg-amber-500/5 rounded-full blur-[60px] group-hover:bg-amber-500/20 transition-all duration-500 pointer-events-none"></div>
             <div className="text-5xl mb-5 drop-shadow-lg">💵</div>
             <h2 className="text-xl md:text-2xl font-black text-orange-50 mb-2 group-hover:text-amber-300 transition-colors">الكاشير / استلام</h2>
-            <p className="text-sm text-orange-200/60 leading-relaxed font-bold">استلام المبالغ من المبيعات وتأكيد الدفع.</p>
+            <p className="text-sm text-orange-200/60 leading-relaxed font-bold">استلام المبالغ من المبيعات المباشرة.</p>
         </div>
 
         {/* 3. زر محاسبة الفنيين */}
@@ -65,6 +65,17 @@ export default function AccountsDashboard({ onNavigate, onBack }) {
             <div className="text-5xl mb-5 drop-shadow-lg">📄</div>
             <h2 className="text-xl md:text-2xl font-black text-orange-50 mb-2 group-hover:text-amber-300 transition-colors">التقارير والأرشيف</h2>
             <p className="text-sm text-orange-200/60 leading-relaxed font-bold">طباعة الكشوفات ومراجعة الأيام السابقة.</p>
+        </div>
+
+        {/* 🆕 5. الزر الجديد: تسوية طلبات التوصيل */}
+        <div 
+            onClick={() => onNavigate('deliverySettlement')}
+            className="group relative bg-emerald-900/20 backdrop-blur-xl p-8 md:p-10 rounded-[2rem] shadow-[0_15px_40px_rgba(0,0,0,0.4)] border border-emerald-500/30 cursor-pointer hover:border-emerald-400 hover:bg-emerald-500/10 transition-all duration-300 hover:-translate-y-2 overflow-hidden md:col-span-2 lg:col-span-1"
+        >
+            <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-500/5 rounded-full blur-[60px] group-hover:bg-emerald-500/20 transition-all duration-500 pointer-events-none"></div>
+            <div className="text-5xl mb-5 drop-shadow-lg">🚚</div>
+            <h2 className="text-xl md:text-2xl font-black text-emerald-400 mb-2 transition-colors">تسوية التوصيل</h2>
+            <p className="text-sm text-emerald-200/70 leading-relaxed font-bold">تحصيل المبالغ من شركات الشحن ومعالجة المرتجعات.</p>
         </div>
 
       </div>
