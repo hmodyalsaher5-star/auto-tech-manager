@@ -15,6 +15,29 @@ export default function CustomerInfo({ formData, setFormData }) {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // قائمة بجميع محافظات العراق
+  const iraqiGovernorates = [
+    "بغداد",
+    "البصرة",
+    "أربيل",
+    "الأنبار",
+    "بابل",
+    "النجف",
+    "نينوى",
+    "الديوانية",
+    "دهوك",
+    "ديالى",
+    "ذي قار",
+    "السليمانية",
+    "صلاح الدين",
+    "كربلاء",
+    "كركوك",
+    "ميسان",
+    "المثنى",
+    "واسط",
+    "حلبجة"
+  ];
+
   return (
     <div className="bg-white/5 backdrop-blur-md p-6 rounded-[2rem] border border-white/10 mb-6 shadow-lg relative z-10">
         <h3 className="text-xl font-bold text-amber-400 mb-6 border-b border-white/10 pb-3 flex items-center gap-2">
@@ -59,10 +82,11 @@ export default function CustomerInfo({ formData, setFormData }) {
                     <select name="governorate" value={formData.governorate} onChange={handleChange} required
                         className="w-full p-3.5 pl-4 pr-11 rounded-xl bg-black/40 border border-white/10 text-white focus:border-amber-500 outline-none transition-all appearance-none cursor-pointer">
                         <option value="" className="bg-gray-900">اختر المحافظة...</option>
-                        <option value="بغداد" className="bg-gray-900">بغداد</option>
-                        <option value="البصرة" className="bg-gray-900">البصرة</option>
-                        <option value="أربيل" className="bg-gray-900">أربيل</option>
-                        {/* يمكنك إضافة بقية المحافظات لاحقاً */}
+                        {iraqiGovernorates.map((gov) => (
+                            <option key={gov} value={gov} className="bg-gray-900">
+                                {gov}
+                            </option>
+                        ))}
                     </select>
                     <Map className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 </div>
