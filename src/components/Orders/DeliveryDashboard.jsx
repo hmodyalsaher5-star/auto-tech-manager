@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabase';
-import { Truck, MapPin, Phone, User, Send, Banknote, FileText } from 'lucide-react'; // 🆕 استدعينا أيقونة FileText لرقم الوصل
+import { Truck, MapPin, Phone, User, Send, Banknote, FileText, Trash2 } from 'lucide-react'; // 🆕 استدعينا Trash2 لزر الإلغاء
 
 export default function DeliveryDashboard() {
   const [deliveries, setDeliveries] = useState([]);
@@ -45,6 +45,24 @@ export default function DeliveryDashboard() {
     }
   };
 
+  // 🆕 3. دالة إلغاء الطلب
+  const handleCancelOrder = async (orderId, customerName) => {
+    const isConfirmed = window.confirm(`هل أنت متأكد من رغبتك في إلغاء طلب (${customerName}) نهائياً؟`);
+    if (!isConfirmed) return;
+
+    const { error } = await supabase
+      .from('orders')
+      .update({ status: 'cancelled' }) // تحويل حالة الطلب إلى ملغي
+      .eq('id', orderId);
+
+    if (error) {
+      alert("حدث خطأ أثناء الإلغاء: " + error.message);
+    } else {
+      alert("تم إلغاء الطلب بنجاح ❌");
+      fetchDeliveries(); // تحديث الشاشة لإخفاء الطلب الملغي
+    }
+  };
+
   if (loading) return <div className="text-sky-400 text-center p-10 font-bold text-xl animate-pulse">جاري تحميل الطلبات... 🚚</div>;
 
   return (
@@ -79,7 +97,7 @@ export default function DeliveryDashboard() {
                      </p>
                   </div>
                   
-                  {/* 🆕 رقم الوصل: مصمم بشكل بارز ومتقطع ليشبه الملصق/الباركود */}
+                  {/* رقم الوصل: مصمم بشكل بارز ومتقطع ليشبه الملصق/الباركود */}
                   <div className="bg-black/50 p-4 rounded-2xl border-2 border-dashed border-sky-400/50 mb-4 flex flex-col items-center justify-center gap-1 shadow-inner">
                       <span className="text-sky-400 text-xs font-bold flex items-center gap-1">
                           <FileText className="w-4 h-4" /> رقم وصل شركة التوصيل:
@@ -98,13 +116,26 @@ export default function DeliveryDashboard() {
                   </div>
               </div>
               
-              <button 
-                onClick={() => handleHandoverToCompany(order.id, order.customer_name)}
-                className="w-full bg-sky-600 hover:bg-sky-500 text-white py-3.5 rounded-xl font-extrabold transition-all active:scale-95 flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(14,165,233,0.3)]"
-              >
-                <Send className="w-5 h-5" />
-                تأكيد التسليم لشركة التوصيل
-              </button>
+              {/* 🆕 قسم الأزرار المحدث */}
+              <div className="flex flex-col gap-2 mt-auto pt-2">
+                <button 
+                  onClick={() => handleHandoverToCompany(order.id, order.customer_name)}
+                  className="w-full bg-sky-600 hover:bg-sky-500 text-white py-3.5 rounded-xl font-extrabold transition-all active:scale-95 flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(14,165,233,0.3)]"
+                >
+                  <Send className="w-5 h-5" />
+                  تأكيد التسليم لشركة التوصيل
+                </button>
+
+                {/* 🆕 زر الإلغاء */}
+                <button 
+                  onClick={() => handleCancelOrder(order.id, order.customer_name)}
+                  className="w-full bg-rose-900/40 hover:bg-rose-600 text-rose-300 hover:text-white py-2.5 rounded-xl font-bold transition-all flex items-center justify-center gap-2 border border-rose-500/30 hover:border-rose-500"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  إلغاء الطلب نهائياً
+                </button>
+              </div>
+
             </div>
           ))}
         </div>

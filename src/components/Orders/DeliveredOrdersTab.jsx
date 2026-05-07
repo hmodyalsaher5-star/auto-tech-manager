@@ -1,0 +1,110 @@
+import React from 'react';
+import { FileText, User, Calculator, Save, ChevronDown, ChevronUp, CarFront, Package, CheckSquare } from 'lucide-react';
+
+export default function DeliveredOrdersTab({ 
+  deliveredOrders, financialInputs, handleInputChange, saveFinancials, 
+  expandedRows, toggleRow, 
+  selectedForSettlement, handleToggleSelectOrder, handleSelectAll, handleCreateSettlement 
+}) {
+  if (deliveredOrders.length === 0) {
+    return <div className="bg-black/40 border border-emerald-500/30 rounded-3xl overflow-hidden shadow-2xl p-10 text-center text-gray-400 font-bold">السجل المالي فارغ.</div>;
+  }
+
+  const isAllSelected = deliveredOrders.length > 0 && selectedForSettlement.length === deliveredOrders.length;
+
+  return (
+    <div className="bg-black/40 border border-emerald-500/30 rounded-3xl overflow-hidden shadow-2xl animate-fadeIn relative pb-20">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm text-right text-gray-300">
+          <thead className="text-xs text-emerald-300 uppercase bg-emerald-900/30 border-b border-emerald-500/30">
+            <tr>
+              {/* 🆕 مربع التحديد للكل */}
+              <th className="px-4 py-5 text-center w-12">
+                 <input 
+                   type="checkbox" 
+                   checked={isAllSelected}
+                   onChange={() => handleSelectAll(isAllSelected)}
+                   className="w-5 h-5 accent-emerald-500 cursor-pointer"
+                 />
+              </th>
+              <th className="px-4 py-5 font-bold"><FileText className="w-4 h-4 inline mr-1"/> رقم الوصل</th>
+              <th className="px-4 py-5 font-bold min-w-[200px]"><User className="w-4 h-4 inline mr-1"/> اسم الزبون</th>
+              <th className="px-4 py-5 font-bold bg-rose-900/10 text-rose-300 text-center">التكلفة</th>
+              <th className="px-4 py-5 font-bold text-center">سعر البيع</th>
+              <th className="px-4 py-5 font-bold bg-orange-900/10 text-orange-300 text-center">سعر التوصيل</th>
+              <th className="px-4 py-5 font-bold bg-emerald-900/20 text-emerald-300 text-center"><Calculator className="w-4 h-4 inline mr-1"/> صافي الربح</th>
+              <th className="px-4 py-5 font-bold text-center">إجراء</th>
+            </tr>
+          </thead>
+          <tbody>
+            {deliveredOrders.map((order) => {
+              const inputs = financialInputs[order.id] || { originalPrice: 0, deliveryCost: 0 };
+              const sellingPrice = parseFloat(order.total_price) || 0;
+              const originalPrice = parseFloat(inputs.originalPrice) || 0;
+              const deliveryCost = parseFloat(inputs.deliveryCost) || 0;
+              const netProfit = sellingPrice - (originalPrice + deliveryCost);
+              const isExpanded = expandedRows.includes(order.id);
+              const isSelected = selectedForSettlement.includes(order.id);
+
+              return (
+                <React.Fragment key={order.id}>
+                  <tr className={`border-b border-white/5 hover:bg-white/5 transition-all ${isSelected ? 'bg-emerald-900/20' : ''}`}>
+                    {/* 🆕 مربع تحديد الطلب */}
+                    <td className="px-4 py-4 text-center">
+                       <input 
+                         type="checkbox" 
+                         checked={isSelected}
+                         onChange={() => handleToggleSelectOrder(order.id)}
+                         className="w-5 h-5 accent-emerald-500 cursor-pointer"
+                       />
+                    </td>
+                    <td className="px-4 py-4 font-mono text-white font-bold" dir="ltr">{order.tracking_number || '---'}</td>
+                    
+                    <td className="px-4 py-4 cursor-pointer group" onClick={() => toggleRow(order.id)}>
+                       <div className="flex items-center gap-2 text-emerald-400 font-bold group-hover:text-emerald-300">
+                          {order.customer_name} {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                       </div>
+                       {order.order_type === 'replacement' && <span className="text-amber-400 text-[10px] bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 mt-1 inline-block">استبدال</span>}
+                    </td>
+
+                    <td className="px-4 py-4 bg-rose-900/10 text-center"><input type="number" value={inputs.originalPrice} onChange={(e) => handleInputChange(order.id, 'originalPrice', e.target.value)} className="w-20 p-2 rounded-lg bg-black/60 border border-rose-500/30 text-white outline-none focus:border-rose-400 text-center" /></td>
+                    <td className="px-4 py-4 text-center text-white font-bold text-lg" dir="ltr">{sellingPrice}</td>
+                    <td className="px-4 py-4 bg-orange-900/10 text-center"><input type="number" value={inputs.deliveryCost} onChange={(e) => handleInputChange(order.id, 'deliveryCost', e.target.value)} className="w-20 p-2 rounded-lg bg-black/60 border border-orange-500/30 text-white outline-none focus:border-orange-400 text-center" /></td>
+                    <td className="px-4 py-4 bg-emerald-900/10 text-center"><span className={`font-black text-xl flex justify-center ${netProfit > 0 ? 'text-emerald-400' : netProfit < 0 ? 'text-rose-500' : 'text-gray-400'}`} dir="ltr">{netProfit > 0 ? '+' : ''}{netProfit}</span></td>
+                    <td className="px-4 py-4 text-center"><button onClick={() => saveFinancials(order.id)} className="bg-emerald-600/20 hover:bg-emerald-500 text-emerald-400 hover:text-black border border-emerald-500/50 p-2 rounded-lg" title="حفظ"><Save className="w-5 h-5" /></button></td>
+                  </tr>
+
+                  {isExpanded && (
+                    <tr className="bg-black/60 border-b border-emerald-500/20 shadow-inner">
+                      <td colSpan="8" className="px-6 py-5">
+                         <div className="flex flex-col gap-3 text-right">
+                            {order.car_brand && (<div className="text-amber-300 font-bold flex items-center gap-2"><CarFront className="w-5 h-5" /> السيارة: {order.car_brand} - {order.car_model} ({order.car_year})</div>)}
+                            <div className="bg-white/5 p-4 rounded-xl border border-white/10"><h4 className="text-emerald-300 font-bold mb-2 flex items-center gap-2"><Package className="w-4 h-4"/> المنتجات:</h4><p className="text-gray-300 whitespace-pre-wrap leading-relaxed text-sm">{order.product_type}</p></div>
+                         </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* 🆕 شريط إجراءات سفلي عائم يظهر عند تحديد طلبات */}
+      {selectedForSettlement.length > 0 && (
+        <div className="absolute bottom-0 left-0 w-full bg-emerald-900/90 backdrop-blur-md p-4 border-t border-emerald-500/50 flex justify-between items-center shadow-[0_-10px_30px_rgba(0,0,0,0.5)] animate-slideUp">
+           <span className="text-white font-bold text-lg">
+             تم تحديد <span className="bg-white text-emerald-900 px-3 py-1 rounded-lg mx-1">{selectedForSettlement.length}</span> طلبات للتحاسب
+           </span>
+           <button 
+             onClick={handleCreateSettlement}
+             className="bg-emerald-500 hover:bg-emerald-400 text-black px-6 py-3 rounded-xl font-extrabold flex items-center gap-2 shadow-lg transition-transform active:scale-95"
+           >
+             <CheckSquare className="w-5 h-5" /> إنشاء فاتورة تحاسب وإغلاق
+           </button>
+        </div>
+      )}
+    </div>
+  );
+}

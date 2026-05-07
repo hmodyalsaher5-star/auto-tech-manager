@@ -124,7 +124,7 @@ function App() {
 
   const isHomeActive = showSearchPanel || (!showCatalogPanel && !showWarehousePanel && !showMasterDataPanel && !showAdminPanel && !showUserPanel && !showAccountsDashboard && !showCashierPanel && !showSalesEntry && !showOrderRegistration && !showOrderPreparation && !showDeliveryDashboard);
 
-  if (authLoading) return <div className="min-h-screen bg-[#1a0f07] flex justify-center items-center text-amber-500 font-bold text-xl">جاري التحقق من الهوية... ⏳</div>;
+  if (authLoading) return <div className="min-h-screen bg-[#1a0f07] flex justify-center items-center text-amber-500 font-bold text-xl font-sans" dir="rtl">جاري التحقق من الهوية... ⏳</div>;
   
   if (!session) return (
     <div className="bg-gradient-to-br from-[#2d1b11] via-[#1a0f07] to-black min-h-screen flex flex-col justify-center items-center p-4">
@@ -155,12 +155,12 @@ function App() {
           
           <>
               <Header />
-              <div className="sticky top-0 z-40 bg-black/40 backdrop-blur-xl border-b border-white/10 p-3 flex justify-between items-center px-4 md:px-6 shadow-2xl">
+              <div className="sticky top-0 z-40 bg-black/40 backdrop-blur-xl border-b border-white/10 p-3 flex justify-between items-center px-4 md:px-6 shadow-2xl" dir="rtl">
                  <div className="flex items-center gap-3">
                     <div className={`w-2 h-2 rounded-full shadow-[0_0_8px_currentColor] ${userRole === 'admin' ? 'bg-rose-400 text-rose-400' : userRole === 'viewer' ? 'bg-teal-400 text-teal-400' : userRole.includes('warehouse') ? 'bg-amber-400 text-amber-400' : 'bg-sky-400 text-sky-400'}`}></div>
                     <div className="max-w-[150px] md:max-w-none overflow-hidden">
                         <p className="text-xs md:text-sm font-bold text-orange-50 truncate">{session.user.email}</p>
-                        <p className="text-[10px] md:text-xs text-orange-200/70 mt-0.5">الدور: <span className="uppercase font-bold text-amber-400">{userRole === 'viewer' ? 'زائر' : userRole}</span></p>
+                        <p className="text-[10px] md:text-xs text-orange-200/70 mt-0.5 uppercase font-bold text-amber-400">{userRole === 'viewer' ? 'زائر' : userRole}</p>
                     </div>
                  </div>
                  <button onClick={handleLogout} className="flex items-center gap-2 text-rose-400/80 text-xs md:text-sm hover:text-rose-400 font-bold transition-colors group">
@@ -169,13 +169,19 @@ function App() {
                  </button>
               </div>
 
-              {/* شبكة الأزرار - جعلناها مرنة أكثر للموبايل */}
-              <div className="w-full max-w-7xl mx-auto px-2 md:px-6 py-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
+              {/* 🕹️ شبكة الأزرار (Glassmorphism + Najdi Accents) */}
+              <div className="w-full max-w-7xl mx-auto px-2 md:px-6 py-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4" dir="rtl">
                 
+                {/* 1. البحث والكتالوج: متاح للجميع */}
                 <button onClick={() => togglePanel('search')} className={`p-4 rounded-2xl md:rounded-[2rem] text-center text-xs md:text-sm font-bold border transition-all duration-300 flex flex-col items-center justify-center gap-2 md:gap-3 backdrop-blur-md shadow-xl hover:-translate-y-1 active:scale-95 ${isHomeActive ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 ring-1 ring-amber-500/30' : 'bg-white/5 border-white/10 text-orange-100/80 hover:bg-white/10 hover:border-teal-400/50 hover:text-teal-300'}`}>
                     <Home className="w-6 h-6 md:w-7 md:h-7" /><span>الرئيسية / بحث</span>
                 </button>
 
+                <button onClick={() => togglePanel('catalog')} className={`p-4 rounded-2xl md:rounded-[2rem] text-center text-xs md:text-sm font-bold border transition-all duration-300 flex flex-col items-center justify-center gap-2 md:gap-3 backdrop-blur-md shadow-xl hover:-translate-y-1 active:scale-95 ${showCatalogPanel ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 ring-1 ring-amber-500/30' : 'bg-white/5 border-white/10 text-orange-100/80 hover:bg-white/10 hover:border-teal-400/50 hover:text-teal-300'}`}>
+                    <Library className="w-6 h-6 md:w-7 md:h-7" /><span>الكتالوج</span>
+                </button>
+
+                {/* 2. صلاحيات المدير فقط (الموظفين والحسابات الكاملة) */}
                 {userRole === 'admin' && (
                     <>
                         <button onClick={() => togglePanel('accounts')} className={`p-4 rounded-2xl md:rounded-[2rem] text-center text-xs md:text-sm font-bold border transition-all duration-300 flex flex-col items-center justify-center gap-2 md:gap-3 backdrop-blur-md shadow-xl hover:-translate-y-1 active:scale-95 ${showAccountsDashboard ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 ring-1 ring-amber-500/30' : 'bg-white/5 border-white/10 text-orange-100/80 hover:bg-white/10 hover:border-teal-400/50 hover:text-teal-300'}`}>
@@ -185,7 +191,12 @@ function App() {
                         <button onClick={() => togglePanel('users')} className={`p-4 rounded-2xl md:rounded-[2rem] text-center text-xs md:text-sm font-bold border transition-all duration-300 flex flex-col items-center justify-center gap-2 md:gap-3 backdrop-blur-md shadow-xl hover:-translate-y-1 active:scale-95 ${showUserPanel ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 ring-1 ring-amber-500/30' : 'bg-white/5 border-white/10 text-orange-100/80 hover:bg-white/10 hover:border-teal-400/50 hover:text-teal-300'}`}>
                             <Users className="w-6 h-6 md:w-7 md:h-7" /><span>الموظفين</span>
                         </button>
+                    </>
+                )}
 
+                {/* 3. إضافة منتج والسيارات: للمدير والمشرف */}
+                {(userRole === 'admin' || userRole === 'supervisor') && (
+                    <>
                         <button onClick={() => togglePanel('admin')} className={`p-4 rounded-2xl md:rounded-[2rem] text-center text-xs md:text-sm font-bold border transition-all duration-300 flex flex-col items-center justify-center gap-2 md:gap-3 backdrop-blur-md shadow-xl hover:-translate-y-1 active:scale-95 ${showAdminPanel ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 ring-1 ring-amber-500/30' : 'bg-white/5 border-white/10 text-orange-100/80 hover:bg-white/10 hover:border-teal-400/50 hover:text-teal-300'}`}>
                             <PackagePlus className="w-6 h-6 md:w-7 md:h-7" /><span>إضافة منتج</span>
                         </button>
@@ -196,52 +207,49 @@ function App() {
                     </>
                 )}
 
+                {/* 4. إدارة المخزن (المدير + موظفي المخزن) */}
                 {(userRole === 'admin' || userRole.includes('warehouse')) && (
                     <button onClick={() => togglePanel('warehouse')} className={`p-4 rounded-2xl md:rounded-[2rem] text-center text-xs md:text-sm font-bold border transition-all duration-300 flex flex-col items-center justify-center gap-2 md:gap-3 backdrop-blur-md shadow-xl hover:-translate-y-1 active:scale-95 ${showWarehousePanel ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 ring-1 ring-amber-500/30' : 'bg-white/5 border-white/10 text-orange-100/80 hover:bg-white/10 hover:border-teal-400/50 hover:text-teal-300'}`}>
                         <Factory className="w-6 h-6 md:w-7 md:h-7" /><span>إدارة المخزن</span>
                     </button>
                 )}
 
+                {/* 5. قسم التجهيز (المدير + المجهز فقط - تم سحبها من موظف المخزن) */}
                 {(userRole === 'admin' || userRole === 'preparer') && (
                     <button onClick={() => togglePanel('orderPreparation')} className={`p-4 rounded-2xl md:rounded-[2rem] text-center text-xs md:text-sm font-bold border transition-all duration-300 flex flex-col items-center justify-center gap-2 md:gap-3 backdrop-blur-md shadow-xl hover:-translate-y-1 active:scale-95 ${showOrderPreparation ? 'bg-teal-500/20 border-teal-500/40 text-teal-300 ring-1 ring-teal-500/30' : 'bg-white/5 border-white/10 text-orange-100/80 hover:bg-white/10 hover:border-teal-400/50 hover:text-teal-300'}`}>
                         <ClipboardCheck className="w-6 h-6 md:w-7 md:h-7" /><span>قسم التجهيز</span>
                     </button>
                 )}
 
-                {(userRole === 'admin' || userRole === 'supervisor' || userRole === 'sales' || userRole === 'delivery' || userRole === 'viewer') && (
+                {/* 6. المبيعات والتوصيل (المدير + مشرف + مبيعات) */}
+                {(userRole === 'admin' || userRole === 'supervisor' || userRole === 'sales') && (
                     <>
-                        {(userRole === 'admin' || userRole === 'sales' || userRole === 'supervisor') && (
-                          <>
-                            <button onClick={() => togglePanel('salesEntry')} className={`p-4 rounded-2xl md:rounded-[2rem] text-center text-xs md:text-sm font-bold border transition-all duration-300 flex flex-col items-center justify-center gap-2 md:gap-3 backdrop-blur-md shadow-xl hover:-translate-y-1 active:scale-95 ${showSalesEntry ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 ring-1 ring-amber-500/30' : 'bg-white/5 border-white/10 text-orange-100/80 hover:bg-white/10 hover:border-teal-400/50 hover:text-teal-300'}`}>
-                                <PenTool className="w-6 h-6 md:w-7 md:h-7" /><span>تسجيل بيع</span>
-                            </button>
-                            
-                            <button onClick={() => togglePanel('orderRegistration')} className={`p-4 rounded-2xl md:rounded-[2rem] text-center text-xs md:text-sm font-bold border transition-all duration-300 flex flex-col items-center justify-center gap-2 md:gap-3 backdrop-blur-md shadow-xl hover:-translate-y-1 active:scale-95 ${showOrderRegistration ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 ring-1 ring-amber-500/30' : 'bg-white/5 border-white/10 text-orange-100/80 hover:bg-white/10 hover:border-teal-400/50 hover:text-teal-300'}`}>
-                                <Truck className="w-6 h-6 md:w-7 md:h-7" /><span>طلب توصيل</span>
-                            </button>
-                          </>
-                        )}
+                        <button onClick={() => togglePanel('salesEntry')} className={`p-4 rounded-2xl md:rounded-[2rem] text-center text-xs md:text-sm font-bold border transition-all duration-300 flex flex-col items-center justify-center gap-2 md:gap-3 backdrop-blur-md shadow-xl hover:-translate-y-1 active:scale-95 ${showSalesEntry ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 ring-1 ring-amber-500/30' : 'bg-white/5 border-white/10 text-orange-100/80 hover:bg-white/10 hover:border-teal-400/50 hover:text-teal-300'}`}>
+                            <PenTool className="w-6 h-6 md:w-7 md:h-7" /><span>تسجيل بيع</span>
+                        </button>
                         
-                        {(userRole === 'admin' || userRole === 'delivery') && (
-                          <button onClick={() => togglePanel('delivery')} className={`p-4 rounded-2xl md:rounded-[2rem] text-center text-xs md:text-sm font-bold border transition-all duration-300 flex flex-col items-center justify-center gap-2 md:gap-3 backdrop-blur-md shadow-xl hover:-translate-y-1 active:scale-95 ${showDeliveryDashboard ? 'bg-sky-500/20 border-sky-400 text-sky-300 ring-1 ring-sky-500/30' : 'bg-white/5 border-white/10 text-orange-100/80 hover:bg-white/10 hover:border-sky-400/50 hover:text-sky-300'}`}>
-                              <MapPin className="w-6 h-6 md:w-7 md:h-7" /><span>لوحة المندوب</span>
-                          </button>
-                        )}
+                        <button onClick={() => togglePanel('orderRegistration')} className={`p-4 rounded-2xl md:rounded-[2rem] text-center text-xs md:text-sm font-bold border transition-all duration-300 flex flex-col items-center justify-center gap-2 md:gap-3 backdrop-blur-md shadow-xl hover:-translate-y-1 active:scale-95 ${showOrderRegistration ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 ring-1 ring-amber-500/30' : 'bg-white/5 border-white/10 text-orange-100/80 hover:bg-white/10 hover:border-teal-400/50 hover:text-teal-300'}`}>
+                            <Truck className="w-6 h-6 md:w-7 md:h-7" /><span>طلب توصيل</span>
+                        </button>
                     </>
                 )}
 
-                <button onClick={() => togglePanel('catalog')} className={`p-4 rounded-2xl md:rounded-[2rem] text-center text-xs md:text-sm font-bold border transition-all duration-300 flex flex-col items-center justify-center gap-2 md:gap-3 backdrop-blur-md shadow-xl hover:-translate-y-1 active:scale-95 ${showCatalogPanel ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 ring-1 ring-amber-500/30' : 'bg-white/5 border-white/10 text-orange-100/80 hover:bg-white/10 hover:border-teal-400/50 hover:text-teal-300'}`}>
-                    <Library className="w-6 h-6 md:w-7 md:h-7" /><span>الكتالوج</span>
-                </button>
+                {/* 7. لوحة المندوب (المدير + المندوب) */}
+                {(userRole === 'admin' || userRole === 'delivery') && (
+                    <button onClick={() => togglePanel('delivery')} className={`p-4 rounded-2xl md:rounded-[2rem] text-center text-xs md:text-sm font-bold border transition-all duration-300 flex flex-col items-center justify-center gap-2 md:gap-3 backdrop-blur-md shadow-xl hover:-translate-y-1 active:scale-95 ${showDeliveryDashboard ? 'bg-sky-500/20 border-sky-400 text-sky-300 ring-1 ring-sky-500/30' : 'bg-white/5 border-white/10 text-orange-100/80 hover:bg-white/10 hover:border-sky-400/50 hover:text-sky-300'}`}>
+                        <MapPin className="w-6 h-6 md:w-7 md:h-7" /><span>لوحة المندوب</span>
+                    </button>
+                )}
 
+                {/* 8. زر المحاسب المخصص (الكاشير فقط) */}
                 {userRole === 'accountant' && (
                     <button onClick={() => togglePanel('cashier')} className={`col-span-2 p-4 rounded-2xl md:rounded-[2rem] text-center text-base md:text-lg font-bold border transition-all duration-300 flex flex-col items-center justify-center gap-3 backdrop-blur-lg shadow-[0_0_20px_rgba(20,184,166,0.2)] hover:-translate-y-1 active:scale-95 bg-teal-500/20 border-teal-500/50 text-teal-300`}>
-                        <Banknote className="w-8 h-8" /><span>الكاشير / الاستلام</span>
+                        <Banknote className="w-8 h-8" /><span>الكاشير / استلام</span>
                     </button>
                 )}
               </div>
 
-              {/* العرض (Panels) - تعديل الحاوية لتكون مرنة بالكامل */}
+              {/* 🖼️ منطقة عرض المحتوى (Content Area) */}
               <div className="w-full max-w-7xl mx-auto px-2 md:px-6 mb-12 overflow-x-hidden">
                   {showAdminPanel && <div className="animate-fadeIn"><AddProductForm /></div>}
                   {showCatalogPanel && <div className="animate-fadeIn"><ProductCatalog userRole={userRole} sizes={sizes} /></div>}
