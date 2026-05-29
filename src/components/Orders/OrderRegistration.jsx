@@ -2,15 +2,14 @@ import React, { useState } from 'react';
 import CustomerInfo from './CustomerInfo';
 import CarInfo from './CarInfo';
 import OrderProducts from './OrderProducts'; 
-import { PackageOpen, Banknote, RefreshCw, PackagePlus, FileText } from 'lucide-react'; 
+import { PackageOpen, Banknote, RefreshCw, PackagePlus, FileText, UserCheck, ShieldAlert } from 'lucide-react'; 
 import { supabase } from '../../supabase';
 
 export default function OrderRegistration({ sizes }) {
   
   const [formData, setFormData] = useState({
-    // 🆕 متغيرات نوع الطلب والاستبدال
-    orderType: 'original', // 'original' (أصلي) | 'replacement' (استبدال)
-    originalTrackingNumber: '', // رقم الوصل القديم (للاستبدال فقط)
+    orderType: 'original', 
+    originalTrackingNumber: '', 
 
     customerName: '',
     phone1: '',
@@ -28,7 +27,9 @@ export default function OrderRegistration({ sizes }) {
     
     manualDetails: '', 
     totalPrice: '', 
-    currency: 'USD' 
+    costPrice: '', // 🆕 إضافة حقل سعر التكلفة في الذاكرة
+    salesEmployee: '', // 🆕 إضافة حقل موظف المبيعات في الذاكرة
+    currency: 'IQD' // 🆕 التعديل الأول: جعل العملة الافتراضية هي الدينار العراقي
   });
 
   const needsCarInfo = formData.products.some(p => p.category === 'screen');
@@ -36,7 +37,6 @@ export default function OrderRegistration({ sizes }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // 🆕 تحقق بسيط: إذا كان استبدال، نفضل كتابة رقم الوصل القديم
     if (formData.orderType === 'replacement' && !formData.originalTrackingNumber.trim()) {
        const confirmEmpty = window.confirm("لم تقم بكتابة رقم الوصل الأصلي لهذا الاستبدال. هل تريد المتابعة بدون ربطه بالطلب القديم؟");
        if (!confirmEmpty) return;
@@ -56,7 +56,6 @@ export default function OrderRegistration({ sizes }) {
       .from('orders')
       .insert([
         {
-          // 🆕 نرسل نوع الطلب ورقم الوصل القديم لقاعدة البيانات
           order_type: formData.orderType,
           original_tracking_number: formData.orderType === 'replacement' ? formData.originalTrackingNumber : null,
 
@@ -78,6 +77,8 @@ export default function OrderRegistration({ sizes }) {
           
           manual_details: formData.manualDetails || null, 
           total_price: formData.totalPrice || 0, 
+          cost_price: formData.costPrice || 0, // 🆕 التعديل الثالث: إرسال سعر التكلفة إلى عمود cost_price
+          sales_employee: formData.salesEmployee, // 🆕 التعديل الثاني: إرسال اسم الموظف إلى عمود sales_employee
           currency: formData.currency, 
           user_email: user?.email || 'unknown',
           status: 'pending' 
@@ -97,13 +98,13 @@ export default function OrderRegistration({ sizes }) {
       <h2 className="text-2xl md:text-3xl font-extrabold mb-8 flex items-center gap-3">
           <PackageOpen className="w-8 h-8 text-amber-400 drop-shadow-md hidden md:block" />
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-orange-400 to-amber-600 drop-shadow-sm">
-             تسجيل طلب توصيل جديد
+              تسجيل طلب توصيل جديد
           </span>
       </h2>
 
       <form onSubmit={handleSubmit} className="max-w-5xl mx-auto">
           
-          {/* 🆕 1. قسم تحديد نوع الطلب (أصلي أم استبدال) */}
+          {/* 1. قسم تحديد نوع الطلب */}
           <div className="bg-white/5 backdrop-blur-md p-6 rounded-[2rem] border border-white/10 mb-6 shadow-lg relative z-10">
               <label className="text-sm text-teal-300 mb-4 block font-bold flex items-center gap-2">
                   <PackageOpen className="w-5 h-5" /> ما هو نوع هذه الطلبية؟
@@ -131,7 +132,6 @@ export default function OrderRegistration({ sizes }) {
                   </label>
               </div>
 
-              {/* 🆕 يظهر حقل رقم الوصل الأصلي فقط إذا كان الطلب استبدال */}
               {formData.orderType === 'replacement' && (
                   <div className="bg-amber-900/20 p-4 rounded-xl border border-amber-500/30 animate-fadeIn">
                       <label className="text-sm text-amber-300 mb-2 block font-bold flex items-center gap-2">
@@ -149,6 +149,21 @@ export default function OrderRegistration({ sizes }) {
               )}
           </div>
 
+          {/* 🆕 التعديل الثاني: إضافة حقل موظف المبيعات الإجباري قبل بيانات الزبون لضمان تحديد هوية كاتب الطلب */}
+          <div className="bg-white/5 backdrop-blur-md p-6 rounded-[2rem] border border-white/10 mb-6 shadow-lg relative z-10">
+              <label className="text-sm text-amber-400 mb-3 block font-bold flex items-center gap-2">
+                  <UserCheck className="w-5 h-5 text-amber-400" /> مسؤول الفاتورة / موظف المبيعات (إجباري)
+              </label>
+              <input 
+                  type="text"
+                  value={formData.salesEmployee}
+                  onChange={(e) => setFormData({...formData, salesEmployee: e.target.value})}
+                  required
+                  placeholder="اكتب اسم موظف المبيعات الذي أنشأ هذا الطلب..."
+                  className="w-full p-4 rounded-xl bg-black/40 border border-white/10 text-white focus:border-amber-500/50 outline-none transition-all shadow-inner text-sm"
+              />
+          </div>
+
           <CustomerInfo formData={formData} setFormData={setFormData} />
 
           {needsCarInfo && (
@@ -157,31 +172,56 @@ export default function OrderRegistration({ sizes }) {
 
           <OrderProducts formData={formData} setFormData={setFormData} />
 
-          <div className="bg-gradient-to-br from-teal-900/40 to-black/60 p-5 sm:p-6 rounded-[2rem] border border-teal-500/30 mt-6 max-w-md mr-auto shadow-xl">
+          {/* التعديل الثالث: إدراج وتوسيع الصندوق المالي ليشمل السعر الإجمالي وسعر التكلفة معاً بالدينار العراقي */}
+          <div className="bg-gradient-to-br from-teal-900/40 to-black/60 p-5 sm:p-6 rounded-[2rem] border border-teal-500/30 mt-6 max-w-xl mr-auto shadow-xl">
               <label className="text-sm text-teal-300 mb-3 font-bold flex items-center gap-2">
-                  <Banknote className="w-5 h-5" /> السعر الإجمالي المطلوب من الزبون (إجباري)
+                  <Banknote className="w-5 h-5" /> تفاصيل التسعير والعملة والربط المالي
               </label>
-              <div className="flex flex-row gap-2 sm:gap-3 w-full">
-                  <select 
-                      value={formData.currency}
-                      onChange={(e) => setFormData({...formData, currency: e.target.value})}
-                      className="w-1/3 p-3 sm:p-4 rounded-xl bg-black/60 border border-teal-500/50 text-amber-400 font-bold outline-none focus:border-teal-400 cursor-pointer"
-                  >
-                      <option className="bg-gray-900 text-white" value="USD">$ دولار</option>
-                      <option className="bg-gray-900 text-white" value="IQD">د.ع دينار</option>
-                  </select>
-                  <input 
-                      type="number" 
-                      value={formData.totalPrice} 
-                      onChange={(e) => setFormData({...formData, totalPrice: e.target.value})} 
-                      required
-                      placeholder="المبلغ (ضع 0 إذا كان مجاني)"
-                      className="w-2/3 p-3 sm:p-4 rounded-xl bg-black/60 border border-teal-500/50 text-white font-bold text-lg sm:text-xl outline-none focus:border-teal-400 text-center"
-                  />
+              
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full">
+                  {/* قائمة اختيار العملة - القيمة الافتراضية أصبحت IQD */}
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[11px] text-gray-400 mr-1">العملة:</span>
+                    <select 
+                        value={formData.currency}
+                        onChange={(e) => setFormData({...formData, currency: e.target.value})}
+                        className="w-full p-3.5 rounded-xl bg-black/60 border border-teal-500/50 text-amber-400 font-bold outline-none focus:border-teal-400 cursor-pointer text-sm"
+                    >
+                        <option className="bg-gray-900 text-white" value="IQD">د.ع دينار</option>
+                        <option className="bg-gray-900 text-white" value="USD">$ دولار</option>
+                    </select>
+                  </div>
+
+                  {/* حقل سعر التكلفة الجديد (إجباري) */}
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[11px] text-orange-300 font-bold mr-1">سعر التكلفة للشركة: *</span>
+                    <input 
+                        type="number" 
+                        value={formData.costPrice} 
+                        onChange={(e) => setFormData({...formData, costPrice: e.target.value})} 
+                        required
+                        placeholder="تكلفة المنتج"
+                        className="w-full p-3.5 rounded-xl bg-black/60 border border-amber-500/40 text-orange-200 font-bold outline-none focus:border-orange-400 text-center text-sm"
+                    />
+                  </div>
+
+                  {/* حقل السعر الإجمالي المطلوب من الزبون */}
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[11px] text-teal-300 font-bold mr-1">السعر المطلوب من الزبون: *</span>
+                    <input 
+                        type="number" 
+                        value={formData.totalPrice} 
+                        onChange={(e) => setFormData({...formData, totalPrice: e.target.value})} 
+                        required
+                        placeholder="المبلغ المطلوب كاملاً"
+                        className="w-full p-3.5 rounded-xl bg-black/60 border border-teal-500/50 text-white font-bold outline-none focus:border-teal-400 text-center text-sm"
+                    />
+                  </div>
               </div>
+
               {formData.orderType === 'replacement' && (
                   <p className="text-xs text-amber-400 mt-3 text-center">
-                      ملاحظة: في طلبات الاستبدال عادة يكون المبلغ 0 أو يمثل أجور التوصيل فقط.
+                      ملاحظة: في طلبات الاستبدال عادة يكون المبلغ المطلوب 0 أو يمثل أجور التوصيل فقط.
                   </p>
               )}
           </div>

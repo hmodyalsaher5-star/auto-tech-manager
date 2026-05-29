@@ -1,5 +1,6 @@
 import React from 'react';
-import { MapPin, Phone, User, CheckCircle, XCircle, Banknote, FileText, RefreshCw } from 'lucide-react';
+// 🆕 1. قمنا بإضافة أيقونة UserCheck إلى قائمة الاستيراد
+import { MapPin, Phone, User, CheckCircle, XCircle, Banknote, FileText, RefreshCw, UserCheck } from 'lucide-react';
 
 export default function ShippedOrdersTab({ shippedOrders, handlePaymentReceived, handleReplacedOrder, handleReturnedOrder }) {
   if (shippedOrders.length === 0) {
@@ -27,9 +28,17 @@ export default function ShippedOrdersTab({ shippedOrders, handlePaymentReceived,
                  <p className="text-sm text-gray-300 flex items-center gap-2 mb-2 bg-white/5 p-2 rounded-lg">
                      <MapPin className="w-4 h-4 text-rose-400" /> {order.governorate} - {order.region}
                  </p>
-                 <p className="text-sm text-sky-300 font-mono flex items-center gap-2 bg-sky-900/20 p-2 rounded-lg border border-sky-500/10" dir="ltr">
+                 <p className="text-sm text-sky-300 font-mono flex items-center gap-2 bg-sky-900/20 p-2 rounded-lg border border-sky-500/10 mb-3" dir="ltr">
                     <Phone className="w-4 h-4" /> {order.phone1} {order.phone2 && `| ${order.phone2}`}
                  </p>
+
+                 {/* 🆕 2. إضافة شارة موظف المبيعات بنفس التصميم الموحد */}
+                 {order.sales_employee && (
+                     <div className="inline-block bg-sky-900/40 border border-sky-500/30 text-sky-300 text-xs px-2.5 py-1.5 rounded-lg font-bold">
+                         <UserCheck className="w-3.5 h-3.5 inline ml-1" />
+                         المبيعات: {order.sales_employee}
+                     </div>
+                 )}
               </div>
               
               <div className="bg-black/50 p-3 rounded-xl border border-dashed border-sky-500/50 mb-4 flex flex-col items-center justify-center gap-1">

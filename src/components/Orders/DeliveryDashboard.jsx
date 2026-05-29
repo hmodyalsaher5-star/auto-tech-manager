@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabase';
-import { Truck, MapPin, Phone, User, Send, Banknote, FileText, Trash2 } from 'lucide-react'; // 🆕 استدعينا Trash2 لزر الإلغاء
+// 🆕 استدعينا UserCheck لموظف المبيعات و RefreshCw لشعار الاستبدال
+import { Truck, MapPin, Phone, User, Send, Banknote, FileText, Trash2, UserCheck, RefreshCw } from 'lucide-react'; 
 
 export default function DeliveryDashboard() {
   const [deliveries, setDeliveries] = useState([]);
@@ -45,7 +46,7 @@ export default function DeliveryDashboard() {
     }
   };
 
-  // 🆕 3. دالة إلغاء الطلب
+  // 3. دالة إلغاء الطلب
   const handleCancelOrder = async (orderId, customerName) => {
     const isConfirmed = window.confirm(`هل أنت متأكد من رغبتك في إلغاء طلب (${customerName}) نهائياً؟`);
     if (!isConfirmed) return;
@@ -83,28 +84,52 @@ export default function DeliveryDashboard() {
               
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-sky-500 to-indigo-500"></div>
 
+              {/* 🆕 شريط علوي صغير يوضح نوع الطلب إذا كان استبدال ليكون المندوب على علم */}
+              {order.order_type === 'replacement' && (
+                  <div className="absolute top-0 right-0 bg-amber-500 text-black text-[10px] font-black px-3 py-1.5 rounded-bl-xl z-10 flex items-center gap-1 shadow-md">
+                      <RefreshCw className="w-3 h-3" /> طلب استبدال
+                  </div>
+              )}
+
               <div>
-                  <div className="mb-4">
-                     <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                  <div className="mb-4 mt-2 border-b border-white/10 pb-4">
+                     <h3 className="text-xl font-bold text-white mb-3 flex items-center gap-2">
                          <User className="w-5 h-5 text-sky-400" /> {order.customer_name}
                      </h3>
+                     
                      <p className="text-sm text-gray-300 flex items-center gap-2 mb-2 bg-white/5 p-2 rounded-lg">
                          <MapPin className="w-4 h-4 text-rose-400" /> 
                          <span>{order.governorate} - {order.region} <br/> <span className="text-xs text-gray-400">{order.landmark && `(${order.landmark})`}</span></span>
                      </p>
-                     <p className="text-sm text-sky-300 font-mono flex items-center gap-2 bg-sky-900/20 p-2 rounded-lg border border-sky-500/10" dir="ltr">
+                     
+                     <p className="text-sm text-sky-300 font-mono flex items-center gap-2 bg-sky-900/20 p-2 rounded-lg border border-sky-500/10 mb-3" dir="ltr">
                         <Phone className="w-4 h-4" /> {order.phone1} {order.phone2 && `| ${order.phone2}`}
                      </p>
+
+                     {/* 🆕 إضافة اسم موظف المبيعات ليعرفه المندوب */}
+                     {order.sales_employee && (
+                         <div className="inline-block bg-sky-900/40 border border-sky-500/30 text-sky-300 text-xs px-2.5 py-1.5 rounded-lg font-bold">
+                             <UserCheck className="w-3.5 h-3.5 inline ml-1" />
+                             المبيعات: {order.sales_employee}
+                         </div>
+                     )}
                   </div>
                   
-                  {/* رقم الوصل: مصمم بشكل بارز ومتقطع ليشبه الملصق/الباركود */}
+                  {/* رقم الوصل */}
                   <div className="bg-black/50 p-4 rounded-2xl border-2 border-dashed border-sky-400/50 mb-4 flex flex-col items-center justify-center gap-1 shadow-inner">
                       <span className="text-sky-400 text-xs font-bold flex items-center gap-1">
                           <FileText className="w-4 h-4" /> رقم وصل شركة التوصيل:
                       </span>
-                      <strong className="text-white font-black text-2xl tracking-widest drop-shadow-md" dir="ltr">
+                      <strong className="text-white font-black text-2xl tracking-widest drop-shadow-md mt-1" dir="ltr">
                           {order.tracking_number || 'بدون رقم'}
                       </strong>
+                      
+                      {/* عرض رقم وصل الاستبدال الأصلي إن وُجد */}
+                      {order.order_type === 'replacement' && order.original_tracking_number && (
+                          <span className="text-amber-400 text-[10px] font-bold mt-2 bg-amber-500/10 px-2 py-1 rounded">
+                              الوصل القديم للاستبدال: {order.original_tracking_number}
+                          </span>
+                      )}
                   </div>
 
                   {/* السعر */}
@@ -116,7 +141,7 @@ export default function DeliveryDashboard() {
                   </div>
               </div>
               
-              {/* 🆕 قسم الأزرار المحدث */}
+              {/* قسم الأزرار */}
               <div className="flex flex-col gap-2 mt-auto pt-2">
                 <button 
                   onClick={() => handleHandoverToCompany(order.id, order.customer_name)}
@@ -126,7 +151,6 @@ export default function DeliveryDashboard() {
                   تأكيد التسليم لشركة التوصيل
                 </button>
 
-                {/* 🆕 زر الإلغاء */}
                 <button 
                   onClick={() => handleCancelOrder(order.id, order.customer_name)}
                   className="w-full bg-rose-900/40 hover:bg-rose-600 text-rose-300 hover:text-white py-2.5 rounded-xl font-bold transition-all flex items-center justify-center gap-2 border border-rose-500/30 hover:border-rose-500"
