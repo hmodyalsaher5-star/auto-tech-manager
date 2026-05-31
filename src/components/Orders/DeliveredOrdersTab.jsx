@@ -29,7 +29,9 @@ export default function DeliveredOrdersTab({
               </th>
               <th className="px-4 py-5 font-bold"><FileText className="w-4 h-4 inline mr-1"/> رقم الوصل</th>
               <th className="px-4 py-5 font-bold min-w-[200px]"><User className="w-4 h-4 inline mr-1"/> العميل / المبيعات</th>
-              <th className="px-4 py-5 font-bold bg-rose-900/10 text-rose-300 text-center">التكلفة (قابلة للتعديل)</th>
+              <th className="px-4 py-5 font-bold bg-rose-900/10 text-rose-300 text-center">التكلفة (تعديل)</th>
+              <th className="px-4 py-5 font-bold bg-blue-950/40 text-blue-300 text-center">مبلغ الحافز</th>
+              <th className="px-4 py-5 font-bold bg-purple-950/40 text-purple-300 text-center">المطلوب للمحل</th>
               <th className="px-4 py-5 font-bold text-center">سعر البيع</th>
               <th className="px-4 py-5 font-bold bg-orange-900/10 text-orange-300 text-center">سعر التوصيل</th>
               <th className="px-4 py-5 font-bold bg-emerald-900/20 text-emerald-300 text-center"><Calculator className="w-4 h-4 inline mr-1"/> صافي الربح</th>
@@ -41,13 +43,22 @@ export default function DeliveredOrdersTab({
               const inputs = financialInputs[order.id] || {};
               const sellingPrice = parseFloat(order.total_price) || 0;
               
-              // 🧠 التعديل الصاروخي والمطور هنا:
-              // إذا كانت القيمة القادمة من الذاكرة فارغة، أو صفراً، أو نص "0"، نقوم بإجبار الحقل على جلب وجعل القيمة الافتراضية هي سعر التكلفة الحقيقي المسجل من المبيعات
+              // معالجة وجلب التكلفة الافتراضية من السيرفر
               const displayOriginalPrice = (inputs.originalPrice !== undefined && inputs.originalPrice !== "" && inputs.originalPrice !== 0 && inputs.originalPrice !== "0") 
                 ? inputs.originalPrice 
                 : (order.cost_price || 0);
-              
               const originalPrice = parseFloat(displayOriginalPrice) || 0;
+              
+              // 🛠️ التعديل الذكي هنا: 
+              // إذا لم يقم المحاسب بتعديل الحافز الآن، نقوم بجلبه فوراً وبقوة من عمود السيرفر المسجل مسبقاً (order.incentive) بدلاً من تصفيره
+              const displayIncentive = (inputs.incentive !== undefined && inputs.incentive !== "") 
+                ? inputs.incentive 
+                : (order.incentive || 0);
+              const incentiveAmount = parseFloat(displayIncentive) || 0;
+
+              // الحساب التلقائي المحدث للمطلوب للمحل
+              const shopRequired = originalPrice - incentiveAmount;
+
               const deliveryCost = parseFloat(inputs.deliveryCost !== undefined ? inputs.deliveryCost : 0) || 0;
               const netProfit = sellingPrice - (originalPrice + deliveryCost);
               
@@ -72,7 +83,7 @@ export default function DeliveredOrdersTab({
                           {order.customer_name} {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                        </div>
                        
-                       {/* إظهار اسم موظف المبيعات ليكون واضحاً للمحاسب */}
+                       {/* إظهار اسم موظف المبيعات */}
                        {order.sales_employee && (
                            <div className="text-sky-300 text-[11px] mt-1.5 flex items-center gap-1 bg-sky-900/30 px-2 py-0.5 rounded border border-sky-500/30 w-fit font-bold">
                                <UserCheck className="w-3.5 h-3.5" /> المبيعات: {order.sales_employee}
@@ -82,14 +93,30 @@ export default function DeliveredOrdersTab({
                        {order.order_type === 'replacement' && <span className="text-amber-400 text-[10px] bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 mt-1 inline-block">استبدال</span>}
                     </td>
 
-                    {/* حقل التكلفة المطور لعرض السعر الحقيقي وقبوله للتعديل اليدوي فورا */}
+                    {/* حقل التكلفة */}
                     <td className="px-4 py-4 bg-rose-900/10 text-center">
                         <input 
                           type="number" 
                           value={displayOriginalPrice} 
                           onChange={(e) => handleInputChange(order.id, 'originalPrice', e.target.value)} 
-                          className="w-24 p-2 rounded-lg bg-black/60 border border-rose-500/30 text-white font-bold outline-none focus:border-rose-400 text-center" 
+                          className="w-24 p-2 rounded-lg bg-black/60 border border-rose-500/30 text-white font-bold outline-none focus:border-rose-400 text-center text-xs" 
                         />
+                    </td>
+
+                    {/* حقل إدخال مبلغ الحافز - أصبح يقرأ القيمة الافتراضية من السيرفر مباشرة */}
+                    <td className="px-4 py-4 bg-blue-950/20 text-center">
+                        <input 
+                          type="number" 
+                          value={displayIncentive} 
+                          onChange={(e) => handleInputChange(order.id, 'incentive', e.target.value)} 
+                          placeholder="0"
+                          className="w-20 p-2 rounded-lg bg-black/60 border border-blue-500/30 text-blue-300 font-bold outline-none focus:border-blue-400 text-center text-xs" 
+                        />
+                    </td>
+
+                    {/* حقل عرض المطلوب للمحل الذكي والمحسوب تلقائياً فورا */}
+                    <td className="px-4 py-4 bg-purple-950/20 text-center text-purple-300 font-black text-base" dir="ltr">
+                        {shopRequired.toLocaleString()}
                     </td>
                     
                     <td className="px-4 py-4 text-center text-white font-bold text-lg" dir="ltr">{sellingPrice}</td>
@@ -99,7 +126,7 @@ export default function DeliveredOrdersTab({
                           type="number" 
                           value={inputs.deliveryCost !== undefined ? inputs.deliveryCost : 0} 
                           onChange={(e) => handleInputChange(order.id, 'deliveryCost', e.target.value)} 
-                          className="w-20 p-2 rounded-lg bg-black/60 border border-orange-500/30 text-white outline-none focus:border-orange-400 text-center" 
+                          className="w-20 p-2 rounded-lg bg-black/60 border border-orange-500/30 text-white outline-none focus:border-orange-400 text-center text-xs" 
                         />
                     </td>
                     
@@ -110,13 +137,14 @@ export default function DeliveredOrdersTab({
                     </td>
                     
                     <td className="px-4 py-4 text-center">
-                        <button onClick={() => saveFinancials(order.id)} className="bg-emerald-600/20 hover:bg-emerald-500 text-emerald-400 hover:text-black border border-emerald-500/50 p-2 rounded-lg" title="حفظ"><Save className="w-5 h-5" /></button>
+                        <button onClick={() => saveFinancials(order.id)} className="bg-emerald-600/20 hover:bg-emerald-500 text-emerald-400 hover:text-black border border-emerald-500/50 p-2 rounded-lg shadow-md transition-all active:scale-95" title="حفظ البيانات المالية للملف"><Save className="w-5 h-5" /></button>
                     </td>
                   </tr>
 
+                  {/* تفاصيل المنتجات الممتدة عند الضغط */}
                   {isExpanded && (
                     <tr className="bg-black/60 border-b border-emerald-500/20 shadow-inner">
-                      <td colSpan="8" className="px-6 py-5">
+                      <td colSpan="10" className="px-6 py-5">
                          <div className="flex flex-col gap-3 text-right">
                             {order.car_brand && (<div className="text-amber-300 font-bold flex items-center gap-2"><CarFront className="w-5 h-5" /> السيارة: {order.car_brand} - {order.car_model} ({order.car_year})</div>)}
                             <div className="bg-white/5 p-4 rounded-xl border border-white/10"><h4 className="text-emerald-300 font-bold mb-2 flex items-center gap-2"><Package className="w-4 h-4"/> المنتجات:</h4><p className="text-gray-300 whitespace-pre-wrap leading-relaxed text-sm">{order.product_type}</p></div>

@@ -1,10 +1,12 @@
 import React from 'react';
 import { supabase } from '../../supabase';
-import { Library, FileText, Banknote, Trash2, Undo, Printer } from 'lucide-react'; // 🆕 استدعاء أيقونة الطابعة
+// 🛡️ استخدمنا الأيقونات الآمنة والموجودة مسبقاً في مشروعك لتفادي الشاشة البيضاء
+import { Library, FileText, Banknote, Trash2, Undo, Printer } from 'lucide-react'; 
 
 export default function AccountingArchiveTab({ archivedOrders, refreshData }) {
   
-  if (archivedOrders.length === 0) {
+  // 🛡️ حماية ضد الشاشة البيضاء: التأكد من أن المتغير مصفوفة صالحة قبل تنفيذ أي عملية
+  if (!archivedOrders || !Array.isArray(archivedOrders) || archivedOrders.length === 0) {
     return (
       <div className="bg-black/40 border border-indigo-500/30 rounded-3xl p-10 text-center text-indigo-300/50 font-bold text-lg border-dashed">
         أرشيف الحسابات فارغ. لم يتم إنشاء أي فواتير تحاسب بعد! 📁
@@ -12,7 +14,7 @@ export default function AccountingArchiveTab({ archivedOrders, refreshData }) {
     );
   }
 
-  // 1. تجميع الطلبات حسب رقم الفاتورة
+  // 1. تجميع الطلبات حسب رقم الفاتورة 
   const groupedInvoices = archivedOrders.reduce((acc, order) => {
     const ref = order.settlement_ref || 'بدون_رقم';
     if (!acc[ref]) {
@@ -21,6 +23,7 @@ export default function AccountingArchiveTab({ archivedOrders, refreshData }) {
         totalRevenue: 0,
         totalDeliveryCost: 0,
         totalOriginalCost: 0,
+        totalIncentive: 0, 
         date: order.created_at
       };
     }
@@ -29,6 +32,7 @@ export default function AccountingArchiveTab({ archivedOrders, refreshData }) {
     acc[ref].totalRevenue += parseFloat(order.total_price) || 0;
     acc[ref].totalOriginalCost += parseFloat(order.original_price) || 0;
     acc[ref].totalDeliveryCost += parseFloat(order.delivery_cost) || 0;
+    acc[ref].totalIncentive += parseFloat(order.incentive) || 0; 
     
     return acc;
   }, {});
@@ -36,17 +40,17 @@ export default function AccountingArchiveTab({ archivedOrders, refreshData }) {
   const invoicesArray = Object.entries(groupedInvoices).map(([ref, data]) => ({
     ref,
     ...data,
-    netProfit: data.totalRevenue - (data.totalOriginalCost + data.totalDeliveryCost)
+    netProfit: data.totalRevenue - (data.totalOriginalCost + data.totalDeliveryCost),
+    totalShopRequired: data.totalOriginalCost - data.totalIncentive 
   }));
 
   // ==========================================
-  // 🖨️ دالة إنشاء وطباعة الفاتورة (أو حفظها PDF)
+  // 🖨️ دالة طباعة الفاتورة العامة 
   // ==========================================
   const handlePrintInvoice = (invoice) => {
     const printWindow = window.open('', '_blank');
     const invoiceDate = new Date(invoice.date).toLocaleDateString('ar-IQ', { year: 'numeric', month: 'long', day: 'numeric' });
 
-    // تصميم سطور الجدول للطباعة
     const tableRows = invoice.orders.map((order, index) => {
       const orderProfit = (parseFloat(order.total_price) || 0) - ((parseFloat(order.original_price) || 0) + (parseFloat(order.delivery_cost) || 0));
       return `
@@ -62,11 +66,10 @@ export default function AccountingArchiveTab({ archivedOrders, refreshData }) {
       `;
     }).join('');
 
-    // القالب الرسمي للفاتورة (A4 Clean White Design)
     const htmlContent = `
       <html dir="rtl">
       <head>
-        <title>فاتورة تحاسب - ${invoice.ref}</title>
+        <title>فاتورة تحاسب عامة - ${invoice.ref}</title>
         <style>
           @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap');
           body { font-family: 'Tajawal', sans-serif; padding: 40px; color: #111827; background: white; }
@@ -153,8 +156,113 @@ export default function AccountingArchiveTab({ archivedOrders, refreshData }) {
   };
 
   // ==========================================
-  // 🟧 دالة فك الفاتورة (إرجاع لسجل الواصل)
+  // 🖨️ دالة طباعة الفاتورة الخاصة للمحل 
   // ==========================================
+  const handlePrintShopInvoice = (invoice) => {
+    const printWindow = window.open('', '_blank');
+    const invoiceDate = new Date(invoice.date).toLocaleDateString('ar-IQ', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    const tableRows = invoice.orders.map((order, index) => {
+      const originalCost = parseFloat(order.original_price) || 0;
+      const incentive = parseFloat(order.incentive) || 0;
+      const shopRequired = originalCost - incentive;
+      
+      return `
+        <tr>
+          <td>${index + 1}</td>
+          <td dir="ltr" style="font-family: monospace;">${order.tracking_number || '-'}</td>
+          <td>${order.customer_name} ${order.order_type === 'replacement' ? '(استبدال)' : ''}</td>
+          <td dir="ltr">${originalCost}</td>
+          <td dir="ltr">${incentive}</td>
+          <td dir="ltr" style="font-weight: bold; color: #7e22ce;">${shopRequired}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const htmlContent = `
+      <html dir="rtl">
+      <head>
+        <title>فاتورة المحل - ${invoice.ref}</title>
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap');
+          body { font-family: 'Tajawal', sans-serif; padding: 40px; color: #111827; background: white; }
+          .header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 3px solid #7e22ce; padding-bottom: 20px; margin-bottom: 30px; }
+          .company-info h1 { margin: 0; color: #7e22ce; font-size: 28px; font-weight: 900; }
+          .company-info p { margin: 5px 0 0 0; color: #6b7280; font-size: 16px; font-weight: bold; }
+          .invoice-details { text-align: left; }
+          .invoice-details h2 { margin: 0 0 10px 0; font-size: 20px; color: #374151; }
+          .invoice-details h2 span { color: #7e22ce; }
+          .invoice-details p { margin: 0; color: #6b7280; font-weight: bold; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+          th, td { border: 1px solid #d1d5db; padding: 12px; text-align: right; }
+          th { background-color: #f3f4f6; color: #374151; font-weight: bold; font-size: 14px; }
+          td { font-size: 14px; }
+          .summary-container { display: flex; justify-content: flex-end; }
+          .summary { width: 350px; background-color: #f9fafb; padding: 20px; border-radius: 12px; border: 1px solid #e5e7eb; }
+          .summary-row { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 15px; color: #4b5563; }
+          .summary-row.total { font-weight: 900; font-size: 20px; color: #7e22ce; border-top: 2px dashed #d1d5db; padding-top: 15px; margin-top: 5px; }
+          .footer { text-align: center; margin-top: 50px; color: #9ca3af; font-size: 12px; border-top: 1px solid #f3f4f6; padding-top: 20px; }
+          @media print {
+            body { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          }
+        </style>
+      </head>
+      <body onload="window.print(); window.close();">
+        <div class="header">
+          <div class="company-info">
+            <h1>فاتورة التحاسب الخاصة بالمحل</h1>
+            <p>كشف تفصيلي بتكلفة البضاعة والمبالغ المطلوبة للمحل</p>
+          </div>
+          <div class="invoice-details">
+            <h2>رقم الفاتورة: <span dir="ltr">${invoice.ref}</span></h2>
+            <p>تاريخ الإنشاء: ${invoiceDate}</p>
+          </div>
+        </div>
+        
+        <table>
+          <thead>
+            <tr>
+              <th>ت</th>
+              <th>رقم الوصل</th>
+              <th>العميل</th>
+              <th>سعر التكلفة (رأس المال)</th>
+              <th>مبلغ الحافز (يُخصم)</th>
+              <th>المطلوب للمحل</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows}
+          </tbody>
+        </table>
+
+        <div class="summary-container">
+          <div class="summary">
+            <div class="summary-row">
+              <span>إجمالي سعر التكلفة:</span>
+              <span dir="ltr" style="font-weight: bold; color: #111827;">${invoice.totalOriginalCost}</span>
+            </div>
+            <div class="summary-row">
+              <span>إجمالي الحوافز (خصم):</span>
+              <span dir="ltr" style="color: #dc2626;">- ${invoice.totalIncentive}</span>
+            </div>
+            <div class="summary-row total">
+              <span>إجمالي المطلوب للمحل:</span>
+              <span dir="ltr">${invoice.totalShopRequired}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer">
+          <p>تم إصدار هذا الكشف آلياً من النظام لأغراض المحاسبة الداخلية. جميع الحقوق محفوظة.</p>
+        </div>
+      </body>
+      </html>
+    `;
+    
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
   const handleRevertInvoice = async (invoiceRef) => {
     const isConfirmed = window.confirm(`هل أنت متأكد من فك ارتباط الفاتورة رقم (${invoiceRef})؟\nسيتم إرجاع جميع طلباتها إلى "سجل الواصل".`);
     if (!isConfirmed) return;
@@ -167,9 +275,6 @@ export default function AccountingArchiveTab({ archivedOrders, refreshData }) {
     else alert("خطأ أثناء الإرجاع: " + error.message);
   };
 
-  // ==========================================
-  // 🟥 دالة الحذف النهائي
-  // ==========================================
   const handlePermanentDelete = async (invoiceRef) => {
     const isConfirmed = window.confirm(`⚠️ تحذير خطير ⚠️\nهل أنت متأكد من الحذف النهائي للفاتورة رقم (${invoiceRef})؟\nهذا الإجراء لا يمكن التراجع عنه!`);
     if (!isConfirmed) return;
@@ -187,36 +292,43 @@ export default function AccountingArchiveTab({ archivedOrders, refreshData }) {
       {invoicesArray.map((invoice) => (
         <div key={invoice.ref} className="bg-gradient-to-br from-indigo-900/20 to-black/60 border border-indigo-500/30 rounded-3xl overflow-hidden shadow-2xl relative group">
           
-          {/* أزرار التحكم (طباعة + إرجاع + حذف نهائي) */}
           <div className="absolute top-4 left-4 flex gap-2 z-10">
-             
-             {/* 🖨️ زر الطباعة الجديد */}
-             <button 
-               onClick={() => handlePrintInvoice(invoice)}
-               className="bg-sky-500/20 hover:bg-sky-600 text-sky-400 hover:text-white p-2.5 rounded-xl transition-all shadow-lg border border-sky-500/30"
-               title="طباعة الفاتورة أو حفظها كملف PDF"
-             >
-               <Printer className="w-5 h-5" />
-             </button>
+              
+              {/* 🖨️ زر طباعة فاتورة المحل (بنفسجي مع أيقونة Banknote الآمنة) */}
+              <button 
+                onClick={() => handlePrintShopInvoice(invoice)}
+                className="bg-purple-500/20 hover:bg-purple-600 text-purple-400 hover:text-white p-2.5 rounded-xl transition-all shadow-lg border border-purple-500/30"
+                title="طباعة كشف حساب المحل (المطلوب للمحل)"
+              >
+                <Banknote className="w-5 h-5" />
+              </button>
 
-             <button 
-               onClick={() => handleRevertInvoice(invoice.ref)}
-               className="bg-amber-500/20 hover:bg-amber-600 text-amber-400 hover:text-white p-2.5 rounded-xl transition-all shadow-lg border border-amber-500/30"
-               title="فك التحاسب وإرجاع الطلبات للسجل"
-             >
-               <Undo className="w-5 h-5" />
-             </button>
-             
-             <button 
-               onClick={() => handlePermanentDelete(invoice.ref)}
-               className="bg-rose-500/20 hover:bg-rose-600 text-rose-400 hover:text-white p-2.5 rounded-xl transition-all shadow-lg border border-rose-500/30"
-               title="حذف الفاتورة نهائياً من النظام!"
-             >
-               <Trash2 className="w-5 h-5" />
-             </button>
+              {/* 🖨️ زر طباعة الفاتورة العامة (أزرق) */}
+              <button 
+                onClick={() => handlePrintInvoice(invoice)}
+                className="bg-sky-500/20 hover:bg-sky-600 text-sky-400 hover:text-white p-2.5 rounded-xl transition-all shadow-lg border border-sky-500/30"
+                title="طباعة الفاتورة العامة الشاملة"
+              >
+                <Printer className="w-5 h-5" />
+              </button>
+
+              <button 
+                onClick={() => handleRevertInvoice(invoice.ref)}
+                className="bg-amber-500/20 hover:bg-amber-600 text-amber-400 hover:text-white p-2.5 rounded-xl transition-all shadow-lg border border-amber-500/30"
+                title="فك التحاسب وإرجاع الطلبات للسجل"
+              >
+                <Undo className="w-5 h-5" />
+              </button>
+              
+              <button 
+                onClick={() => handlePermanentDelete(invoice.ref)}
+                className="bg-rose-500/20 hover:bg-rose-600 text-rose-400 hover:text-white p-2.5 rounded-xl transition-all shadow-lg border border-rose-500/30"
+                title="حذف الفاتورة نهائياً من النظام!"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
           </div>
 
-          {/* رأس الفاتورة */}
           <div className="bg-indigo-900/40 p-5 border-b border-indigo-500/20 flex flex-col md:flex-row justify-between items-center gap-4">
              <div className="flex items-center gap-3">
                 <div className="bg-indigo-500/20 p-3 rounded-2xl border border-indigo-500/30">
@@ -232,8 +344,11 @@ export default function AccountingArchiveTab({ archivedOrders, refreshData }) {
                 </div>
              </div>
              
-             {/* ملخص أرباح الفاتورة */}
              <div className="flex gap-4 bg-black/40 p-3 rounded-2xl border border-white/5 md:mr-auto md:ml-36">
+                <div className="text-center px-3 border-l border-white/10">
+                   <p className="text-xs text-gray-400 mb-1">المطلوب للمحل</p>
+                   <p className="font-bold text-purple-400" dir="ltr">{invoice.totalShopRequired}</p>
+                </div>
                 <div className="text-center px-3 border-l border-white/10">
                    <p className="text-xs text-gray-400 mb-1">الإجمالي المُحصل</p>
                    <p className="font-bold text-white" dir="ltr">{invoice.totalRevenue}</p>
@@ -245,7 +360,6 @@ export default function AccountingArchiveTab({ archivedOrders, refreshData }) {
              </div>
           </div>
 
-          {/* جدول طلبات الفاتورة */}
           <div className="overflow-x-auto p-4">
             <table className="w-full text-sm text-right text-gray-300">
               <thead className="text-xs text-indigo-300 uppercase border-b border-indigo-500/20">
@@ -253,20 +367,25 @@ export default function AccountingArchiveTab({ archivedOrders, refreshData }) {
                   <th className="px-4 py-3 font-bold">رقم الوصل</th>
                   <th className="px-4 py-3 font-bold">العميل</th>
                   <th className="px-4 py-3 font-bold text-center">التكلفة</th>
-                  <th className="px-4 py-3 font-bold text-center">التوصيل</th>
+                  <th className="px-4 py-3 font-bold text-center">الحافز</th>
+                  <th className="px-4 py-3 font-bold text-center">للمحل</th>
                   <th className="px-4 py-3 font-bold text-center">الربح</th>
                 </tr>
               </thead>
               <tbody>
                 {invoice.orders.map((order) => {
-                   const orderProfit = (parseFloat(order.total_price) || 0) - ((parseFloat(order.original_price) || 0) + (parseFloat(order.delivery_cost) || 0));
+                   const originalCost = parseFloat(order.original_price) || 0;
+                   const incentive = parseFloat(order.incentive) || 0;
+                   const shopReq = originalCost - incentive;
+                   const orderProfit = (parseFloat(order.total_price) || 0) - (originalCost + (parseFloat(order.delivery_cost) || 0));
                    
                    return (
                      <tr key={order.id} className="border-b border-white/5 hover:bg-white/5">
                         <td className="px-4 py-3 font-mono text-white" dir="ltr">{order.tracking_number || '-'}</td>
                         <td className="px-4 py-3 font-bold text-indigo-200">{order.customer_name}</td>
-                        <td className="px-4 py-3 text-center">{order.original_price || 0}</td>
-                        <td className="px-4 py-3 text-center">{order.delivery_cost || 0}</td>
+                        <td className="px-4 py-3 text-center">{originalCost}</td>
+                        <td className="px-4 py-3 text-center">{incentive}</td>
+                        <td className="px-4 py-3 text-center font-bold text-purple-400">{shopReq}</td>
                         <td className="px-4 py-3 text-center font-bold text-emerald-400" dir="ltr">{orderProfit > 0 ? '+' : ''}{orderProfit}</td>
                      </tr>
                    );

@@ -9,7 +9,7 @@ import GeneralFilters from './GeneralFilters';
 import { 
     Search, Filter, Ruler, FolderOpen, Loader2, 
     PackageSearch, Sparkles, Library, ArrowUp, CarFront, Settings2, Calendar,
-    CheckCircle2, CheckSquare
+    CheckCircle2, CheckSquare, ChevronRight, ChevronLeft
 } from 'lucide-react';
 
 export default function ProductCatalog({ userRole, sizes: propSizes }) {
@@ -18,6 +18,10 @@ export default function ProductCatalog({ userRole, sizes: propSizes }) {
   const [sizes, setSizes] = useState([]);
   const [accessoryCategories, setAccessoryCategories] = useState([]);
   const [showTopBtn, setShowTopBtn] = useState(false); 
+
+  // إعدادات نظام الصفحات (Pagination)
+  const [currentPage, setCurrentPage] = useState(1);
+  const PRODUCTS_PER_PAGE = 50; 
 
   const [brands, setBrands] = useState([]);
   const [models, setModels] = useState([]);
@@ -53,24 +57,19 @@ export default function ProductCatalog({ userRole, sizes: propSizes }) {
         setSelectedProducts([...products]);
     }
   };
-// 📄 دالة توليد ملف الـ PDF
+
   const generatePDF = () => {
-    // 1. نبحث عن "الورقة" بواسطة الـ ID الخاص بها
     const element = document.getElementById('pdf-content');
-    
-    // 2. إعدادات الطباعة (جودة عالية، مقاس A4)
     const opt = {
       margin:       0.5,
       filename:     'كتالوج_منتجات.pdf',
       image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true }, // useCORS مهمة جداً لكي تظهر صور Supabase في الـ PDF
+      html2canvas:  { scale: 2, useCORS: true }, 
       jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
     };
-
-    // 3. أمر التصوير والتحميل
     html2pdf().set(opt).from(element).save();
   };
-  // ✅ دوال "ناقل الحركة" الجديدة (تفرغ القوائم فوراً عند التغيير)
+
   const handleBrandChange = (e) => {
     setFilterBrand(e.target.value);
     setFilterModel('');
@@ -115,9 +114,8 @@ export default function ProductCatalog({ userRole, sizes: propSizes }) {
     fetchInitialData();
   }, [propSizes]);
 
-  // ✅ الـ useEffect أصبحت نظيفة وبدون أخطاء
   useEffect(() => {
-    if (!filterBrand) return; // توقف هنا ولا تفعل شيئاً إذا لم يحدد الموظف شركة
+    if (!filterBrand) return; 
     const fetchModels = async () => {
       const { data } = await supabase.from('car_models').select('*').eq('brand_id', filterBrand);
       setModels(data || []);
@@ -126,7 +124,7 @@ export default function ProductCatalog({ userRole, sizes: propSizes }) {
   }, [filterBrand]);
 
   useEffect(() => {
-    if (!filterModel) return; // توقف هنا إذا لم يحدد الموظف موديلاً
+    if (!filterModel) return; 
     const fetchGenerations = async () => {
       const { data } = await supabase.from('car_generations').select('*').eq('car_model_id', filterModel);
       setGenerations(data || []);
@@ -138,6 +136,7 @@ export default function ProductCatalog({ userRole, sizes: propSizes }) {
     const fetchProducts = async () => {
       setLoading(true);
       setSelectedProducts([]); 
+      setCurrentPage(1); 
 
       try {
         let framesQuery = supabase.from('frames').select('*');
@@ -219,6 +218,101 @@ export default function ProductCatalog({ userRole, sizes: propSizes }) {
     ));
   };
 
+  // حسابات التصفح وتقطيع المنتجات
+  const indexOfLastProduct = currentPage * PRODUCTS_PER_PAGE;
+  const indexOfFirstProduct = indexOfLastProduct - PRODUCTS_PER_PAGE;
+  const currentProducts = products.slice(indexOfFirstProduct, indexOfLastProduct);
+  const totalPages = Math.ceil(products.length / PRODUCTS_PER_PAGE);
+
+  const paginate = (pageNumber) => {
+      setCurrentPage(pageNumber);
+      scrollToTop(); 
+  };
+
+  // 🆕 دالة إنشاء الترقيم المباشر على طريقة نظام بحث Google
+  const renderPagination = () => {
+    if (loading || totalPages <= 1) return null;
+    
+    // إعداد النطاق الذكي لعرض الأرقام (أقصى عدد أزرار معروضة في نفس الوقت هو 5)
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+    if (endPage - startPage + 1 < maxVisiblePages) {
+        startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+
+    const pageNumbers = [];
+    for (let i = startPage; i <= endPage; i++) {
+        pageNumbers.push(i);
+    }
+
+    return (
+        <div className="flex flex-wrap justify-center items-center gap-2 md:gap-3 my-6 relative z-10 w-full select-none">
+            {/* زر السابق */}
+            <button 
+                onClick={() => paginate(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="flex items-center gap-1 px-3 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 rounded-xl disabled:opacity-20 disabled:cursor-not-allowed font-bold border border-amber-500/20 transition-all text-xs md:text-sm active:scale-95"
+            >
+                <ChevronRight className="w-4 h-4" /> السابق
+            </button>
+            
+            {/* عرض الصفحة الأولى إذا كانت بعيدة */}
+            {startPage > 1 && (
+                <>
+                    <button 
+                        onClick={() => paginate(1)}
+                        className="px-3 py-1.5 rounded-xl font-bold transition-all text-xs md:text-sm bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10 active:scale-95"
+                    >
+                        1
+                    </button>
+                    {startPage > 2 && <span className="text-gray-500 px-1 text-sm">...</span>}
+                </>
+            )}
+
+            {/* أرقام الصفحات المباشرة (مثل نظام جوجل) */}
+            <div className="flex items-center gap-1.5">
+                {pageNumbers.map(num => (
+                    <button
+                        key={num}
+                        onClick={() => paginate(num)}
+                        className={`px-3.5 py-1.5 rounded-xl font-extrabold transition-all text-xs md:text-sm active:scale-95 border ${
+                            currentPage === num
+                                ? 'bg-amber-500 text-gray-950 border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.4)]'
+                                : 'bg-white/5 text-gray-300 border-white/10 hover:bg-white/10 hover:text-white'
+                        }`}
+                    >
+                        {num}
+                    </button>
+                ))}
+            </div>
+
+            {/* عرض الصفحة الأخيرة إذا كانت بعيدة */}
+            {endPage < totalPages && (
+                <>
+                    {endPage < totalPages - 1 && <span className="text-gray-500 px-1 text-sm">...</span>}
+                    <button 
+                        onClick={() => paginate(totalPages)}
+                        className="px-3 py-1.5 rounded-xl font-bold transition-all text-xs md:text-sm bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10 active:scale-95"
+                    >
+                        {totalPages}
+                    </button>
+                </>
+            )}
+
+            {/* زر التالي */}
+            <button 
+                onClick={() => paginate(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="flex items-center gap-1 px-3 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 rounded-xl disabled:opacity-20 disabled:cursor-not-allowed font-bold border border-amber-500/20 transition-all text-xs md:text-sm active:scale-95"
+            >
+                التالي <ChevronLeft className="w-4 h-4" />
+            </button>
+        </div>
+    );
+  };
+
   return (
     <div className="p-2 md:p-6 animate-fadeIn relative text-right dir-rtl min-h-[600px]">
       
@@ -229,11 +323,10 @@ export default function ProductCatalog({ userRole, sizes: propSizes }) {
           </span>
       </h2>
 
-      <div className="relative z-10 bg-white/5 backdrop-blur-2xl p-6 md:p-8 rounded-[2rem] border border-amber-500/20 mb-10 shadow-2xl overflow-hidden">
+      <div className="relative z-10 bg-white/5 backdrop-blur-2xl p-6 md:p-8 rounded-[2rem] border border-amber-500/20 mb-6 shadow-2xl overflow-hidden">
         
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-20 bg-amber-500/5 blur-3xl rounded-full pointer-events-none"></div>
 
-      {/* 🆕 استدعاء موظف الاستقبال (الفلتر) وتمرير الأدوات والصلاحيات له */}
         <CarFilter 
             brands={brands}
             models={models}
@@ -246,7 +339,6 @@ export default function ProductCatalog({ userRole, sizes: propSizes }) {
             onGenerationChange={setFilterGeneration}
         />
 
-    {/* 🆕 استدعاء موظف الاستعلامات العامة (الفلاتر) */}
         <GeneralFilters 
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}
@@ -278,14 +370,17 @@ export default function ProductCatalog({ userRole, sizes: propSizes }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 relative z-10 pb-20">
+      {/* 🆕 شريط التنقل (العلوي المباشر) */}
+      {renderPagination()}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 relative z-10 pb-4 mt-4">
         {loading ? (
            <div className="col-span-full flex flex-col items-center justify-center py-20 text-amber-500/80 gap-3">
               <Loader2 className="w-12 h-12 animate-spin" />
               <p className="font-bold tracking-wide">جاري سحب البيانات...</p>
            </div>
-        ) : products.length > 0 ? (
-           products.map(product => {
+        ) : currentProducts.length > 0 ? (
+           currentProducts.map(product => {
              const isSelected = selectedProducts.some(p => p.id === product.id && p.table === product.table);
              return (
                <ProductCard 
@@ -308,7 +403,11 @@ export default function ProductCatalog({ userRole, sizes: propSizes }) {
         )}
       </div>
 
-   {/* 🆕 استدعاء مكون محاسب الطباعة الجديد وتمرير الأدوات له */}
+      {/* 🆕 شريط التنقل (السفلي المباشر) */}
+      <div className="mb-24">
+          {renderPagination()}
+      </div>
+
       <PdfCartBar 
           selectedProducts={selectedProducts} 
           onGeneratePDF={generatePDF} 
@@ -323,22 +422,20 @@ export default function ProductCatalog({ userRole, sizes: propSizes }) {
 
       {editingProduct && (
         <EditProductModal product={editingProduct} onClose={() => setEditingProduct(null)} onUpdate={handleUpdate} />
-      )}{/* 📄 الورقة البيضاء المخفية (مُحدثة بألوان تقليدية لتفادي خطأ oklch) */}
+      )}
+
+      {/* 📄 الورقة البيضاء المخفية للملفات المستندة على PDF */}
       <div className="absolute left-[-9999px] top-0">
           <div id="pdf-content" style={{ width: '800px', backgroundColor: '#ffffff', padding: '32px', direction: 'rtl', textAlign: 'right', fontFamily: 'sans-serif' }}>
-              
-              {/* ترويسة الكتالوج */}
               <div style={{ textAlign: 'center', marginBottom: '32px', borderBottom: '4px solid #f59e0b', paddingBottom: '24px' }}>
                   <h1 style={{ fontSize: '36px', fontWeight: 'bold', color: '#1f2937', margin: '0 0 8px 0' }}>كتالوج المنتجات</h1>
                   <p style={{ color: '#6b7280', fontWeight: 'bold', margin: '0' }}>مُصمم خصيصاً لاختياراتك</p>
               </div>
 
-              {/* شبكة المنتجات (في الورقة) */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px' }}>
                   {selectedProducts.map(product => (
                     <div key={product.id} style={{ width: 'calc(50% - 12px)', border: '2px solid #f3f4f6', padding: '16px', borderRadius: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', boxSizing: 'border-box', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
                           <img 
-                              /* استبدلنا الرابط المعطل برابط بديل آمن في حال لم توجد صورة */
                               src={product.image_url || "https://placehold.co/300x300?text=No+Image"} 
                               alt={product.name} 
                               style={{ width: '160px', height: '160px', objectFit: 'contain', marginBottom: '16px', borderRadius: '12px' }}
@@ -356,7 +453,6 @@ export default function ProductCatalog({ userRole, sizes: propSizes }) {
                   ))}
               </div>
 
-              {/* تذييل الورقة */}
               <div style={{ marginTop: '48px', paddingTop: '24px', borderTop: '2px solid #f3f4f6', textAlign: 'center', fontSize: '14px', color: '#9ca3af', fontWeight: 'bold' }}>
                   تم إصدار هذا الكتالوج من نظام مبيعات الشركة
               </div>
@@ -364,5 +460,4 @@ export default function ProductCatalog({ userRole, sizes: propSizes }) {
       </div>
     </div>
   );
-  
 }

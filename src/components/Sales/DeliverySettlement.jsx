@@ -4,7 +4,7 @@ import { Truck, MapPin, BookOpen, XCircle, Library } from 'lucide-react';
 import ShippedOrdersTab from '../Orders/ShippedOrdersTab';
 import DeliveredOrdersTab from '../Orders/DeliveredOrdersTab';
 import ReturnedOrdersTab from '../Orders/ReturnedOrdersTab';
-import AccountingArchiveTab from '../Orders/AccountingArchiveTab'; // 🆕 ملف الأرشيف الجديد
+import AccountingArchiveTab from '../Orders/AccountingArchiveTab';
 
 export default function DeliverySettlement() {
   const [activeTab, setActiveTab] = useState('shipped'); 
@@ -12,13 +12,12 @@ export default function DeliverySettlement() {
   const [shippedOrders, setShippedOrders] = useState([]);
   const [deliveredOrders, setDeliveredOrders] = useState([]);
   const [returnedOrders, setReturnedOrders] = useState([]); 
-  const [archivedOrders, setArchivedOrders] = useState([]); // 🆕 طلبات الأرشيف
+  const [archivedOrders, setArchivedOrders] = useState([]); 
   const [loading, setLoading] = useState(true);
 
   const [financialInputs, setFinancialInputs] = useState({});
   const [expandedRows, setExpandedRows] = useState([]);
   
-  // 🆕 تحديد الطلبات المراد التحاسب عليها
   const [selectedForSettlement, setSelectedForSettlement] = useState([]);
 
   const fetchAllData = async () => {
@@ -34,7 +33,12 @@ export default function DeliverySettlement() {
       setDeliveredOrders(delivered);
       const initialInputs = {};
       delivered.forEach(order => {
-        initialInputs[order.id] = { originalPrice: order.original_price || '', deliveryCost: order.delivery_cost || '' };
+        // 🆕 تم إضافة الحافز للذاكرة الأولية
+        initialInputs[order.id] = { 
+          originalPrice: order.original_price || '', 
+          deliveryCost: order.delivery_cost || '',
+          incentive: order.incentive || ''
+        };
       });
       setFinancialInputs(initialInputs);
     }
@@ -43,7 +47,7 @@ export default function DeliverySettlement() {
     const { data: returned } = await supabase.from('orders').select('*').in('status', ['returned', 'replaced']).order('created_at', { ascending: false });
     setReturnedOrders(returned || []);
 
-    // 🆕 4. الأرشيف (الطلبات التي تم التحاسب عليها وإغلاقها)
+    // 4. الأرشيف
     const { data: archived } = await supabase.from('orders').select('*').eq('status', 'settled_archived').order('created_at', { ascending: false });
     setArchivedOrders(archived || []);
 
@@ -52,7 +56,6 @@ export default function DeliverySettlement() {
 
   useEffect(() => { fetchAllData(); }, []);
 
-  // الدوال السابقة...
   const handlePaymentReceived = async (orderId, customerName, amount, currency) => {
     if (!window.confirm(`هل تؤكد استلام مبلغ (${amount} ${currency}) من العميل ${customerName}؟`)) return;
     const { error } = await supabase.from('orders').update({ status: 'delivered' }).eq('id', orderId);
@@ -78,38 +81,75 @@ export default function DeliverySettlement() {
     if (!error) { alert("تم تأكيد الاستلام للمخزن بنجاح!"); fetchAllData(); } else alert("خطأ: " + error.message);
   };
 
-  const handleInputChange = (orderId, field, value) => { setFinancialInputs(prev => ({ ...prev, [orderId]: { ...prev[orderId], [field]: value } })); };
-  const saveFinancials = async (orderId) => {
-    const { originalPrice, deliveryCost } = financialInputs[orderId];
-    const { error } = await supabase.from('orders').update({ original_price: originalPrice || 0, delivery_cost: deliveryCost || 0 }).eq('id', orderId);
-    if (!error) alert("تم حفظ الحسابات بنجاح!"); else alert("خطأ: " + error.message);
+  const handleInputChange = (orderId, field, value) => { 
+    setFinancialInputs(prev => ({ ...prev, [orderId]: { ...prev[orderId], [field]: value } })); 
   };
+
+  // ==========================================
+  // 🆕 دالة الحفظ الفردي المحدثة
+  // ==========================================
+  const saveFinancials = async (orderId) => {
+    const inputs = financialInputs[orderId] || {};
+    const order = deliveredOrders.find(o => o.id === orderId);
+
+    const finalOriginalPrice = inputs.originalPrice !== undefined && inputs.originalPrice !== "" ? inputs.originalPrice : (order.original_price || order.cost_price || 0);
+    const finalDeliveryCost = inputs.deliveryCost !== undefined && inputs.deliveryCost !== "" ? inputs.deliveryCost : (order.delivery_cost || 0);
+    const finalIncentive = inputs.incentive !== undefined && inputs.incentive !== "" ? inputs.incentive : (order.incentive || 0);
+
+    const { error } = await supabase.from('orders')
+      .update({ 
+        original_price: finalOriginalPrice, 
+        delivery_cost: finalDeliveryCost,
+        incentive: finalIncentive // 👈 إرسال الحافز للسيرفر
+      }).eq('id', orderId);
+
+    if (!error) alert("تم حفظ الحسابات بنجاح!"); 
+    else alert("خطأ: " + error.message);
+  };
+
   const toggleRow = (orderId) => { setExpandedRows(prev => prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, orderId]); };
 
   // ==========================================
-  // 🆕 دالة إنشاء فاتورة التحاسب
+  // 🆕 دالة إنشاء الفاتورة المحدثة والآمنة (تحفظ كل الأرقام قبل الإغلاق)
   // ==========================================
   const handleCreateSettlement = async () => {
     if (selectedForSettlement.length === 0) return alert("يرجى تحديد طلب واحد على الأقل للتحاسب!");
     
     if (!window.confirm(`هل أنت متأكد من إنشاء فاتورة تحاسب لعدد (${selectedForSettlement.length}) طلبات ونقلها للأرشيف؟`)) return;
 
-    // توليد رقم فاتورة فريد (مثال: INV-12345678)
     const invoiceRef = `INV-${Math.floor(100000 + Math.random() * 900000)}`;
 
-    const { error } = await supabase.from('orders')
-      .update({ 
-        status: 'settled_archived', 
-        settlement_ref: invoiceRef 
-      })
-      .in('id', selectedForSettlement);
+    // 💡 نقوم بعمل تحديث فردي لكل طلب لضمان حفظ المبالغ المالية (تكلفة، حافز، توصيل) المدخلة حديثاً
+    const promises = selectedForSettlement.map(orderId => {
+      const inputs = financialInputs[orderId] || {};
+      const order = deliveredOrders.find(o => o.id === orderId);
 
-    if (!error) {
-      alert(`تم التحاسب بنجاح! رقم الفاتورة: ${invoiceRef} 🧾`);
-      setSelectedForSettlement([]); // تفريغ التحديد
-      fetchAllData(); // تحديث الشاشة
-    } else {
-      alert("حدث خطأ أثناء التحاسب: " + error.message);
+      const finalOriginal = inputs.originalPrice !== undefined && inputs.originalPrice !== "" ? inputs.originalPrice : (order.original_price || order.cost_price || 0);
+      const finalDelivery = inputs.deliveryCost !== undefined && inputs.deliveryCost !== "" ? inputs.deliveryCost : (order.delivery_cost || 0);
+      const finalIncentive = inputs.incentive !== undefined && inputs.incentive !== "" ? inputs.incentive : (order.incentive || 0);
+
+      return supabase.from('orders').update({
+        status: 'settled_archived',
+        settlement_ref: invoiceRef,
+        original_price: finalOriginal,
+        delivery_cost: finalDelivery,
+        incentive: finalIncentive // 👈 حفظ الحافز ضمن الفاتورة
+      }).eq('id', orderId);
+    });
+
+    try {
+      const results = await Promise.all(promises);
+      const hasError = results.some(res => res.error);
+      
+      if (!hasError) {
+        alert(`تم التحاسب بنجاح! رقم الفاتورة: ${invoiceRef} 🧾`);
+        setSelectedForSettlement([]);
+        fetchAllData(); 
+      } else {
+        alert("حدث خطأ في تحديث بعض الطلبات، يرجى المراجعة.");
+      }
+    } catch (err) {
+      alert("حدث خطأ غير متوقع: " + err.message);
     }
   };
 
@@ -140,16 +180,14 @@ export default function DeliverySettlement() {
         <button onClick={() => setActiveTab('returned')} className={`px-5 py-2.5 rounded-xl font-bold transition-all flex items-center gap-2 ${activeTab === 'returned' ? 'bg-rose-600 text-white' : 'text-gray-400 hover:text-white'}`}>
           <XCircle className="w-4 h-4" /> سجل الرواجع ({returnedOrders.length})
         </button>
-        {/* 🆕 تبويبة الأرشيف */}
         <button onClick={() => setActiveTab('archive')} className={`px-5 py-2.5 rounded-xl font-bold transition-all flex items-center gap-2 ${activeTab === 'archive' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}>
-          <Library className="w-4 h-4" /> أرشيف الحسابات أرشيف الحسابات
+          <Library className="w-4 h-4" /> أرشيف الحسابات
         </button>
       </div>
 
       {activeTab === 'shipped' && <ShippedOrdersTab shippedOrders={shippedOrders} handlePaymentReceived={handlePaymentReceived} handleReplacedOrder={handleReplacedOrder} handleReturnedOrder={handleReturnedOrder} />}
       {activeTab === 'returned' && <ReturnedOrdersTab returnedOrders={returnedOrders} handleConfirmStockReturn={handleConfirmStockReturn} />}
       
-      {/* 🆕 تم تمرير دوال التحديد إلى سجل الواصل */}
       {activeTab === 'delivered' && (
         <DeliveredOrdersTab 
           deliveredOrders={deliveredOrders} financialInputs={financialInputs} 
@@ -162,7 +200,6 @@ export default function DeliverySettlement() {
         />
       )}
 
-      {/* 🆕 عرض تبويبة الأرشيف */}
       {activeTab === 'archive' && <AccountingArchiveTab archivedOrders={archivedOrders} refreshData={fetchAllData} />}
     </div>
   );

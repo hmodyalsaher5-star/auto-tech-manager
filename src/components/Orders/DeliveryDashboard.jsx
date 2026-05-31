@@ -68,9 +68,21 @@ export default function DeliveryDashboard() {
 
   return (
     <div className="p-4 md:p-8 animate-fadeIn text-right" dir="rtl">
-      <h2 className="text-2xl font-bold text-sky-400 mb-8 flex items-center gap-3 border-b border-sky-500/20 pb-4">
-        <Truck className="w-8 h-8" />
-        قسم التوزيع (تسليم الطلبات لشركة التوصيل)
+      
+      {/* 🆕 التعديل هنا: تحديث الهيدر ليحتوي على العنوان جهة اليمين وعداد الطلبات جهة اليسار بكل مرونة وتناسق */}
+      <h2 className="text-2xl font-bold text-sky-400 mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-sky-500/20 pb-4">
+        <div className="flex items-center gap-3">
+          <Truck className="w-8 h-8" />
+          <span>قسم التوزيع (تسليم الطلبات لشركة التوصيل)</span>
+        </div>
+        
+        {/* شارة عداد الطلبات مع المندوبين */}
+        <div className="bg-sky-500/10 border border-sky-500/30 text-sky-400 px-4 py-2 rounded-2xl font-extrabold text-sm flex items-center gap-2.5 shadow-inner">
+          <span>الطلبات الجاهزة للتسليم:</span>
+          <span className="bg-sky-500 text-black px-2.5 py-0.5 rounded-lg font-black text-base shadow-md animate-fadeIn">
+            {deliveries.length}
+          </span>
+        </div>
       </h2>
 
       {deliveries.length === 0 ? (
@@ -84,7 +96,7 @@ export default function DeliveryDashboard() {
               
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-sky-500 to-indigo-500"></div>
 
-              {/* 🆕 شريط علوي صغير يوضح نوع الطلب إذا كان استبدال ليكون المندوب على علم */}
+              {/* شريط علوي صغير يوضح نوع الطلب إذا كان استبدال ليكون المندوب على علم */}
               {order.order_type === 'replacement' && (
                   <div className="absolute top-0 right-0 bg-amber-500 text-black text-[10px] font-black px-3 py-1.5 rounded-bl-xl z-10 flex items-center gap-1 shadow-md">
                       <RefreshCw className="w-3 h-3" /> طلب استبدال
@@ -106,7 +118,7 @@ export default function DeliveryDashboard() {
                         <Phone className="w-4 h-4" /> {order.phone1} {order.phone2 && `| ${order.phone2}`}
                      </p>
 
-                     {/* 🆕 إضافة اسم موظف المبيعات ليعرفه المندوب */}
+                     {/* إضافة اسم موظف المبيعات ليعرفه المندوب */}
                      {order.sales_employee && (
                          <div className="inline-block bg-sky-900/40 border border-sky-500/30 text-sky-300 text-xs px-2.5 py-1.5 rounded-lg font-bold">
                              <UserCheck className="w-3.5 h-3.5 inline ml-1" />

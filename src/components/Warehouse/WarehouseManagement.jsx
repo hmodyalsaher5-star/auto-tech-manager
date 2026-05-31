@@ -19,7 +19,11 @@ export default function WarehouseManagement({ userRole }) {
   const [sizes, setSizes] = useState([]); 
   const [logs, setLogs] = useState([]);
 
-  // 🆕 ذواكر الفلتر الذكي بالأسماء الصحيحة لقاعدة بياناتك
+  // إعدادات نظام الصفحات (Pagination) المباشر
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 50;
+
+  // ذواكر الفلتر الذكي بالأسماء الصحيحة لقاعدة بياناتك
   const [brandsList, setBrandsList] = useState([]);
   const [modelsList, setModelsList] = useState([]);
   const [generationsList, setGenerationsList] = useState([]);
@@ -52,7 +56,6 @@ export default function WarehouseManagement({ userRole }) {
             const { data: screens } = await supabase.from('screens').select('*').order('id');
             const { data: sizesData } = await supabase.from('standard_sizes').select('*');
             
-            // 🆕 جلب بيانات السيارات بالجداول الصحيحة
             const { data: brandsData } = await supabase.from('brands').select('*');
             const { data: modelsData } = await supabase.from('car_models').select('*');
             const { data: generationsData } = await supabase.from('car_generations').select('*');
@@ -96,6 +99,11 @@ export default function WarehouseManagement({ userRole }) {
       setLoading(false);
   };
 
+  // تصفير الصفحة الحالية عند تعديل أي فلتر أو تبويب لمنع الاختفاء الفجائي للبيانات
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, searchTerm, filterType, filterSize, filterStatus, filterBrand, filterModel, filterGeneration, filterLogType, filterDateFrom, filterDateTo]);
+
   const handleDeleteLog = async (logId) => {
     if (!window.confirm("⚠️ هل أنت متأكد من حذف هذا السجل نهائياً؟")) return;
     const { error } = await supabase.from('stock_logs').delete().eq('id', logId);
@@ -107,7 +115,7 @@ export default function WarehouseManagement({ userRole }) {
     if (!error) setLogs(prev => prev.map(log => log.id === logId ? { ...log, ...updatedFields } : log));
   };
 
-  // 🧠 الفلترة المحدثة والذكية جداً
+  // الفلترة الخاصة بالمنتجات
   const filteredProducts = products.filter(item => {
       const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesType = filterType === 'all' || item.type === filterType;
@@ -119,7 +127,6 @@ export default function WarehouseManagement({ userRole }) {
       if (filterStatus === 'low') matchesStatus = item.stock_quantity <= 5 && item.stock_quantity > 0;
       if (filterStatus === 'out') matchesStatus = item.stock_quantity === 0;
 
-      // 🔍 منطق مطابقة السيارة المحدث
       let matchesCar = true;
       if (filterGeneration) {
           matchesCar = item.generation_id == filterGeneration;
@@ -135,6 +142,7 @@ export default function WarehouseManagement({ userRole }) {
       return matchesSearch && matchesType && matchesSize && matchesStatus && matchesCar;
   });
 
+  // الفلترة الخاصة بالسجلات
   const filteredLogs = logs.filter(log => {
       const matchesType = filterLogType === 'all' || log.movement_type === filterLogType;
       let matchesDate = true;
@@ -146,6 +154,106 @@ export default function WarehouseManagement({ userRole }) {
       }
       return matchesType && matchesDate;
   });
+
+  // تحديد القائمة النشطة حالياً وحسابات التقطيع والتصفح
+  const activeList = activeTab === 'inventory' ? filteredProducts : filteredLogs;
+  const totalPages = Math.ceil(activeList.length / ITEMS_PER_PAGE);
+  const indexOfLastItem = currentPage * ITEMS_PER_PAGE;
+  const indexOfFirstItem = indexOfLastItem - ITEMS_PER_PAGE;
+  const paginatedItems = activeList.slice(indexOfFirstItem, indexOfLastItem);
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // 🆕 دالة إنشاء الترقيم المباشر الذكي (بدون قوائم منسدلة)
+  const renderPagination = () => {
+    if (loading || totalPages <= 1) return null;
+
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+    if (endPage - startPage + 1 < maxVisiblePages) {
+        startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+
+    const pageNumbers = [];
+    for (let i = startPage; i <= endPage; i++) {
+        pageNumbers.push(i);
+    }
+
+    // تخصيص الألوان بناءً على التبويب النشط لجمالية التصميم
+    const activeColorClass = activeTab === 'inventory' 
+      ? 'bg-blue-600 border-blue-600 shadow-[0_0_15px_rgba(37,99,235,0.3)] text-white' 
+      : 'bg-orange-600 border-orange-600 shadow-[0_0_15px_rgba(234,88,12,0.3)] text-white';
+
+    return (
+        <div className="flex flex-wrap justify-center items-center gap-2 my-6 select-none dir-rtl w-full">
+            {/* زر السابق */}
+            <button 
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl disabled:opacity-20 disabled:cursor-not-allowed font-bold border border-gray-700 transition-all text-xs md:text-sm active:scale-95"
+            >
+                🡪 السابق
+            </button>
+            
+            {/* الصفحة الأولى إذا كانت بعيدة */}
+            {startPage > 1 && (
+                <>
+                    <button 
+                        onClick={() => handlePageChange(1)}
+                        className="px-3 py-1.5 rounded-xl font-bold transition-all text-xs md:text-sm bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700 active:scale-95"
+                    >
+                        1
+                    </button>
+                    {startPage > 2 && <span className="text-gray-500 px-1 text-xs">...</span>}
+                </>
+            )}
+
+            {/* الأرقام المباشرة */}
+            <div className="flex items-center gap-1">
+                {pageNumbers.map(num => (
+                    <button
+                        key={num}
+                        onClick={() => handlePageChange(num)}
+                        className={`px-3.5 py-1.5 rounded-xl font-extrabold transition-all text-xs md:text-sm border ${
+                            currentPage === num
+                                ? activeColorClass
+                                : 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700 hover:text-white active:scale-95'
+                        }`}
+                    >
+                        {num}
+                    </button>
+                ))}
+            </div>
+
+            {/* الصفحة الأخيرة إذا كانت بعيدة */}
+            {endPage < totalPages && (
+                <>
+                    {endPage < totalPages - 1 && <span className="text-gray-500 px-1 text-xs">...</span>}
+                    <button 
+                        onClick={() => handlePageChange(totalPages)}
+                        className="px-3 py-1.5 rounded-xl font-bold transition-all text-xs md:text-sm bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700 active:scale-95"
+                    >
+                        {totalPages}
+                    </button>
+                </>
+            )}
+
+            {/* زر التالي */}
+            <button 
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl disabled:opacity-20 disabled:cursor-not-allowed font-bold border border-gray-700 transition-all text-xs md:text-sm active:scale-95"
+            >
+                التالي 🡨
+            </button>
+        </div>
+    );
+  };
 
   const handleTransactionSubmit = async (data) => {
     const { item, type, quantity, reason, refNumber, notes } = data;
@@ -196,7 +304,7 @@ export default function WarehouseManagement({ userRole }) {
         
         <div className="flex flex-col md:flex-row justify-between items-center border-b border-gray-700 pb-4 gap-4">
             <div><h1 className="text-2xl font-bold text-gray-100">🏭 إدارة المستودع</h1></div>
-            <div className="flex bg-gray-800 p-1 rounded-lg">
+            <div className="flex bg-gray-800 p-1 rounded-lg border border-gray-700">
                 <button onClick={() => setActiveTab('inventory')} className={`px-6 py-2 rounded-md font-bold transition ${activeTab === 'inventory' ? 'bg-blue-600 text-white' : 'text-gray-400'}`}>📦 المخزون</button>
                 <button onClick={() => setActiveTab('logs')} className={`px-6 py-2 rounded-md font-bold transition ${activeTab === 'logs' ? 'bg-orange-600 text-white' : 'text-gray-400'}`}>📜 السجل العام</button>
             </div>
@@ -207,7 +315,6 @@ export default function WarehouseManagement({ userRole }) {
                 
                 {activeTab === 'inventory' ? (
                    <>
-                      {/* 🆕 استدعاء مكون الفلتر الذكي الخاص بك وتمرير القوائم الصحيحة */}
                       <CarFilter 
                           brands={brandsList}
                           models={modelsList.filter(m => m.brand_id == filterBrand)}
@@ -220,8 +327,7 @@ export default function WarehouseManagement({ userRole }) {
                           onGenerationChange={(val) => setFilterGeneration(val)}
                       />
 
-                      {/* زر إزالة فلتر السيارة */}
-                      {(filterBrand) && (
+                      {filterBrand && (
                           <div className="flex justify-end -mt-8 relative z-20">
                              <button onClick={() => { setFilterBrand(''); setFilterModel(''); setFilterGeneration(''); }} className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 px-3 py-1.5 rounded-lg transition-colors text-xs font-bold border border-rose-500/30 bg-black/50 backdrop-blur-md">
                                  ✖ مسح فلتر السيارة
@@ -230,11 +336,11 @@ export default function WarehouseManagement({ userRole }) {
                       )}
 
                       <div className="flex flex-col lg:flex-row gap-4 justify-between items-center w-full mt-4">
-                          <input type="text" placeholder="🔍 بحث عن منتج بالاسم..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full lg:w-1/3 p-3 rounded bg-gray-700 border border-gray-600 text-white outline-none"/>
+                          <input type="text" placeholder="🔍 بحث عن منتج بالاسم..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full lg:w-1/3 p-3 rounded bg-gray-700 border border-gray-600 text-white outline-none focus:border-blue-500"/>
                           <div className="flex gap-2 flex-wrap items-center">
-                              <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="p-2 rounded bg-gray-700 border border-gray-600 text-white"><option value="all">كل الأنواع</option><option value="screen">شاشات</option><option value="frame">إطارات</option></select>
-                              <select value={filterSize} onChange={(e) => setFilterSize(e.target.value)} className="p-2 rounded bg-gray-700 border border-gray-600 text-white"><option value="all">كل المقاسات</option>{sizes.map(s => <option key={s.id} value={s.id}>{s.size_name}</option>)}</select>
-                              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="p-2 rounded bg-gray-700 border border-gray-600 text-white font-bold"><option value="all">📊 كل الحالات</option><option value="available" className="text-green-400">✅ المتوفر</option><option value="has_damage" className="text-red-400">🛠️ تالف/صيانة</option><option value="low" className="text-yellow-400">⚠️ النواقص</option><option value="out" className="text-gray-400">❌ المنتهية</option></select>
+                              <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="p-2 rounded bg-gray-700 border border-gray-600 text-white outline-none"><option value="all">كل الأنواع</option><option value="screen">شاشات</option><option value="frame">إطارات</option></select>
+                              <select value={filterSize} onChange={(e) => setFilterSize(e.target.value)} className="p-2 rounded bg-gray-700 border border-gray-600 text-white outline-none"><option value="all">كل المقاسات</option>{sizes.map(s => <option key={s.id} value={s.id}>{s.size_name}</option>)}</select>
+                              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="p-2 rounded bg-gray-700 border border-gray-600 text-white outline-none font-bold"><option value="all">📊 كل الحالات</option><option value="available" className="text-green-400">✅ المتوفر</option><option value="has_damage" className="text-red-400">🛠️ تالف/صيانة</option><option value="low" className="text-yellow-400">⚠️ النواقص</option><option value="out" className="text-gray-400">❌ المنتهية</option></select>
                           </div>
                       </div>
                    </>
@@ -250,7 +356,7 @@ export default function WarehouseManagement({ userRole }) {
                                     <button onClick={() => {setFilterDateFrom(''); setFilterDateTo('');}} className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 p-1.5 rounded-full transition-colors" title="إلغاء التواريخ">✖</button>
                                 )}
                             </div>
-                            <select value={filterLogType} onChange={(e) => setFilterLogType(e.target.value)} className="bg-gray-700 border border-gray-600 text-white p-2.5 rounded-lg text-sm font-bold">
+                            <select value={filterLogType} onChange={(e) => setFilterLogType(e.target.value)} className="bg-gray-700 border border-gray-600 text-white p-2.5 rounded-lg text-sm font-bold outline-none">
                                 <option value="all">📊 كل الحركات</option>
                                 <option value="IN">📥 الوارد فقط</option>
                                 <option value="OUT">📤 الصادر فقط</option>
@@ -261,10 +367,13 @@ export default function WarehouseManagement({ userRole }) {
                 )}
             </div>
 
+            {/* 🆕 شريط التنقل العلوي المباشر */}
+            {renderPagination()}
+
             {loading ? <p className="text-center text-gray-400 py-10">جاري التحميل...</p> : (
                 activeTab === 'inventory' ? (
                     <InventoryTable 
-                        products={filteredProducts} sizes={sizes} showActions={!isSupervisor}
+                        products={paginatedItems} sizes={sizes} showActions={!isSupervisor}
                         onImageClick={(imageUrl) => setPreviewImage(imageUrl)}
                         onTransaction={(item, type) => setTransactionModal({ isOpen: true, item, type })}
                         onMaintenance={(item) => setMaintenanceModal({ isOpen: true, item })}
@@ -272,12 +381,15 @@ export default function WarehouseManagement({ userRole }) {
                     />
                 ) : (
                     <LogsTable 
-                        logs={filteredLogs} products={products} isAdmin={isAdmin} 
+                        logs={paginatedItems} products={products} isAdmin={isAdmin} 
                         onDeleteLog={handleDeleteLog} onUpdateLog={handleUpdateLog}
                         onImageClick={(imageUrl) => setPreviewImage(imageUrl)}
                     />
                 )
             )}
+
+            {/* 🆕 شريط التنقل السفلي المباشر */}
+            {renderPagination()}
         </div>
 
         {!isSupervisor && (
