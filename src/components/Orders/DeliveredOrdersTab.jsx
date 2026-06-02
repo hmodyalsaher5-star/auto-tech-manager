@@ -76,7 +76,10 @@ export default function DeliveredOrdersTab({
                 <th className="px-4 py-5 font-bold bg-rose-900/10 text-rose-300 text-center">التكلفة (تعديل)</th>
                 <th className="px-4 py-5 font-bold bg-blue-950/40 text-blue-300 text-center">مبلغ الحافز</th>
                 <th className="px-4 py-5 font-bold bg-purple-950/40 text-purple-300 text-center">المطلوب للمحل</th>
-                <th className="px-4 py-5 font-bold text-center">سعر البيع</th>
+                
+                {/* 🆕 حقل سعر البيع (سابقاً كان مجرد نص يعرض السعر، الآن أصبح حقل إدخال) */}
+                <th className="px-4 py-5 font-bold text-center">سعر البيع (تعديل)</th>
+                
                 <th className="px-4 py-5 font-bold bg-orange-900/10 text-orange-300 text-center">سعر التوصيل</th>
                 <th className="px-4 py-5 font-bold bg-emerald-900/20 text-emerald-300 text-center"><Calculator className="w-4 h-4 inline mr-1"/> صافي الربح</th>
                 <th className="px-4 py-5 font-bold text-center">إجراء</th>
@@ -86,13 +89,20 @@ export default function DeliveredOrdersTab({
               {/* 🆕 تم تغيير المصفوفة هنا لتقرأ من filteredOrders بدلاً من deliveredOrders */}
               {filteredOrders.map((order) => {
                 const inputs = financialInputs[order.id] || {};
-                const sellingPrice = parseFloat(order.total_price) || 0;
                 
+                // 🆕 جلب وتعديل سعر البيع
+                const displaySellingPrice = (inputs.totalPrice !== undefined && inputs.totalPrice !== "") 
+                  ? inputs.totalPrice 
+                  : (order.total_price || 0);
+                const sellingPrice = parseFloat(displaySellingPrice) || 0;
+                
+                // معالجة وجلب التكلفة الافتراضية
                 const displayOriginalPrice = (inputs.originalPrice !== undefined && inputs.originalPrice !== "" && inputs.originalPrice !== 0 && inputs.originalPrice !== "0") 
                   ? inputs.originalPrice 
                   : (order.cost_price || 0);
                 const originalPrice = parseFloat(displayOriginalPrice) || 0;
                 
+                // معالجة وجلب الحافز الافتراضي
                 const displayIncentive = (inputs.incentive !== undefined && inputs.incentive !== "") 
                   ? inputs.incentive 
                   : (order.incentive || 0);
@@ -101,6 +111,8 @@ export default function DeliveredOrdersTab({
                 const shopRequired = originalPrice - incentiveAmount;
 
                 const deliveryCost = parseFloat(inputs.deliveryCost !== undefined ? inputs.deliveryCost : 0) || 0;
+                
+                // 🆕 حساب صافي الربح بناءً على سعر البيع الجديد
                 const netProfit = sellingPrice - (originalPrice + deliveryCost);
                 
                 const isExpanded = expandedRows.includes(order.id);
@@ -156,7 +168,15 @@ export default function DeliveredOrdersTab({
                           {shopRequired.toLocaleString()}
                       </td>
                       
-                      <td className="px-4 py-4 text-center text-white font-bold text-lg" dir="ltr">{sellingPrice}</td>
+                      {/* 🆕 حقل سعر البيع المحدث ليكون قابلاً للتعديل */}
+                      <td className="px-4 py-4 text-center">
+                          <input 
+                            type="number" 
+                            value={displaySellingPrice} 
+                            onChange={(e) => handleInputChange(order.id, 'totalPrice', e.target.value)} 
+                            className="w-24 p-2 rounded-lg bg-black/60 border border-emerald-500/30 text-white font-bold outline-none focus:border-emerald-400 text-center text-sm" 
+                          />
+                      </td>
                       
                       <td className="px-4 py-4 bg-orange-900/10 text-center">
                           <input 
