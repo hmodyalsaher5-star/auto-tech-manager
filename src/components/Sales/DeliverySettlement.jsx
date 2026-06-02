@@ -33,11 +33,12 @@ export default function DeliverySettlement() {
       setDeliveredOrders(delivered);
       const initialInputs = {};
       delivered.forEach(order => {
-        // 🆕 تم إضافة الحافز للذاكرة الأولية
+        // 🆕 تم إضافة سعر البيع (totalPrice) لكي يتعرف عليه النظام عند التحميل
         initialInputs[order.id] = { 
           originalPrice: order.original_price || '', 
           deliveryCost: order.delivery_cost || '',
-          incentive: order.incentive || ''
+          incentive: order.incentive || '',
+          totalPrice: order.total_price || '' // 👈 التعديل هنا
         };
       });
       setFinancialInputs(initialInputs);
@@ -86,7 +87,7 @@ export default function DeliverySettlement() {
   };
 
   // ==========================================
-  // 🆕 دالة الحفظ الفردي المحدثة
+  // 🆕 دالة الحفظ الفردي المحدثة لتدعم سعر البيع
   // ==========================================
   const saveFinancials = async (orderId) => {
     const inputs = financialInputs[orderId] || {};
@@ -95,12 +96,16 @@ export default function DeliverySettlement() {
     const finalOriginalPrice = inputs.originalPrice !== undefined && inputs.originalPrice !== "" ? inputs.originalPrice : (order.original_price || order.cost_price || 0);
     const finalDeliveryCost = inputs.deliveryCost !== undefined && inputs.deliveryCost !== "" ? inputs.deliveryCost : (order.delivery_cost || 0);
     const finalIncentive = inputs.incentive !== undefined && inputs.incentive !== "" ? inputs.incentive : (order.incentive || 0);
+    
+    // 🆕 سحب سعر البيع المعدل
+    const finalTotalPrice = inputs.totalPrice !== undefined && inputs.totalPrice !== "" ? inputs.totalPrice : (order.total_price || 0);
 
     const { error } = await supabase.from('orders')
       .update({ 
         original_price: finalOriginalPrice, 
         delivery_cost: finalDeliveryCost,
-        incentive: finalIncentive // 👈 إرسال الحافز للسيرفر
+        incentive: finalIncentive,
+        total_price: finalTotalPrice // 👈 إرسال سعر البيع الجديد لقاعدة البيانات
       }).eq('id', orderId);
 
     if (!error) alert("تم حفظ الحسابات بنجاح!"); 
@@ -110,7 +115,7 @@ export default function DeliverySettlement() {
   const toggleRow = (orderId) => { setExpandedRows(prev => prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, orderId]); };
 
   // ==========================================
-  // 🆕 دالة إنشاء الفاتورة المحدثة والآمنة (تحفظ كل الأرقام قبل الإغلاق)
+  // 🆕 دالة إنشاء الفاتورة المحدثة لتدعم حفظ سعر البيع
   // ==========================================
   const handleCreateSettlement = async () => {
     if (selectedForSettlement.length === 0) return alert("يرجى تحديد طلب واحد على الأقل للتحاسب!");
@@ -119,7 +124,6 @@ export default function DeliverySettlement() {
 
     const invoiceRef = `INV-${Math.floor(100000 + Math.random() * 900000)}`;
 
-    // 💡 نقوم بعمل تحديث فردي لكل طلب لضمان حفظ المبالغ المالية (تكلفة، حافز، توصيل) المدخلة حديثاً
     const promises = selectedForSettlement.map(orderId => {
       const inputs = financialInputs[orderId] || {};
       const order = deliveredOrders.find(o => o.id === orderId);
@@ -127,13 +131,17 @@ export default function DeliverySettlement() {
       const finalOriginal = inputs.originalPrice !== undefined && inputs.originalPrice !== "" ? inputs.originalPrice : (order.original_price || order.cost_price || 0);
       const finalDelivery = inputs.deliveryCost !== undefined && inputs.deliveryCost !== "" ? inputs.deliveryCost : (order.delivery_cost || 0);
       const finalIncentive = inputs.incentive !== undefined && inputs.incentive !== "" ? inputs.incentive : (order.incentive || 0);
+      
+      // 🆕 سحب سعر البيع المعدل
+      const finalTotalPrice = inputs.totalPrice !== undefined && inputs.totalPrice !== "" ? inputs.totalPrice : (order.total_price || 0);
 
       return supabase.from('orders').update({
         status: 'settled_archived',
         settlement_ref: invoiceRef,
         original_price: finalOriginal,
         delivery_cost: finalDelivery,
-        incentive: finalIncentive // 👈 حفظ الحافز ضمن الفاتورة
+        incentive: finalIncentive,
+        total_price: finalTotalPrice // 👈 حفظ سعر البيع الجديد في السيرفر مع الفاتورة
       }).eq('id', orderId);
     });
 
