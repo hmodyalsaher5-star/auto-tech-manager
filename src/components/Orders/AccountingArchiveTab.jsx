@@ -1,11 +1,9 @@
 import React from 'react';
 import { supabase } from '../../supabase';
-// 🛡️ استخدمنا الأيقونات الآمنة والموجودة مسبقاً في مشروعك لتفادي الشاشة البيضاء
 import { Library, FileText, Banknote, Trash2, Undo, Printer } from 'lucide-react'; 
 
 export default function AccountingArchiveTab({ archivedOrders, refreshData }) {
   
-  // 🛡️ حماية ضد الشاشة البيضاء: التأكد من أن المتغير مصفوفة صالحة قبل تنفيذ أي عملية
   if (!archivedOrders || !Array.isArray(archivedOrders) || archivedOrders.length === 0) {
     return (
       <div className="bg-black/40 border border-indigo-500/30 rounded-3xl p-10 text-center text-indigo-300/50 font-bold text-lg border-dashed">
@@ -14,7 +12,7 @@ export default function AccountingArchiveTab({ archivedOrders, refreshData }) {
     );
   }
 
-  // 1. تجميع الطلبات حسب رقم الفاتورة 
+  // 1. تجميع الطلبات وحساب المجاميع
   const groupedInvoices = archivedOrders.reduce((acc, order) => {
     const ref = order.settlement_ref || 'بدون_رقم';
     if (!acc[ref]) {
@@ -37,30 +35,51 @@ export default function AccountingArchiveTab({ archivedOrders, refreshData }) {
     return acc;
   }, {});
 
-  const invoicesArray = Object.entries(groupedInvoices).map(([ref, data]) => ({
-    ref,
-    ...data,
-    netProfit: data.totalRevenue - (data.totalOriginalCost + data.totalDeliveryCost),
-    totalShopRequired: data.totalOriginalCost - data.totalIncentive 
-  }));
+  const invoicesArray = Object.entries(groupedInvoices).map(([ref, data]) => {
+    const totalShopRequired = data.totalOriginalCost - data.totalIncentive;
+    // 💡 التعديل المحاسبي: صافي الربح = الإيراد - المطلوب للمحل - التوصيل
+    const netProfit = data.totalRevenue - totalShopRequired - data.totalDeliveryCost;
+    
+    return {
+      ref,
+      ...data,
+      totalShopRequired,
+      netProfit
+    };
+  });
 
   // ==========================================
-  // 🖨️ دالة طباعة الفاتورة العامة 
+  // 🖨️ دالة طباعة الفاتورة العامة (تم إضافة الحافز وتصحيح الحسابات)
   // ==========================================
   const handlePrintInvoice = (invoice) => {
     const printWindow = window.open('', '_blank');
     const invoiceDate = new Date(invoice.date).toLocaleDateString('ar-IQ', { year: 'numeric', month: 'long', day: 'numeric' });
 
     const tableRows = invoice.orders.map((order, index) => {
-      const orderProfit = (parseFloat(order.total_price) || 0) - ((parseFloat(order.original_price) || 0) + (parseFloat(order.delivery_cost) || 0));
+      const originalCost = parseFloat(order.original_price) || 0;
+      const incentive = parseFloat(order.incentive) || 0;
+      const deliveryCost = parseFloat(order.delivery_cost) || 0;
+      const totalPrice = parseFloat(order.total_price) || 0;
+      
+      const shopRequired = originalCost - incentive;
+      const orderProfit = totalPrice - shopRequired - deliveryCost; // 💡 إضافة الحافز لربح الطلب
+      
+      const carInfo = order.car_brand ? `🚗 السيارة: ${order.car_brand} - ${order.car_model || ''} (${order.car_year || ''})` : '';
+      const productsInfo = order.product_type ? `📦 المنتجات: ${order.product_type}` : '';
+
       return `
         <tr>
           <td>${index + 1}</td>
           <td dir="ltr" style="font-family: monospace;">${order.tracking_number || '-'}</td>
-          <td>${order.customer_name} ${order.order_type === 'replacement' ? '(استبدال)' : ''}</td>
-          <td dir="ltr">${order.original_price || 0}</td>
-          <td dir="ltr">${order.delivery_cost || 0}</td>
-          <td dir="ltr">${order.total_price || 0}</td>
+          <td>
+            <div style="font-weight: bold; font-size: 14px;">${order.customer_name} ${order.order_type === 'replacement' ? '(استبدال)' : ''}</div>
+            ${productsInfo ? `<div style="font-size: 11px; color: #4b5563; margin-top: 4px; white-space: pre-wrap;">${productsInfo}</div>` : ''}
+            ${carInfo ? `<div style="font-size: 11px; color: #b45309; margin-top: 2px; font-weight: bold;">${carInfo}</div>` : ''}
+          </td>
+          <td dir="ltr">${originalCost}</td>
+          <td dir="ltr" style="color: #059669; font-weight: bold;">${incentive}</td>
+          <td dir="ltr">${deliveryCost}</td>
+          <td dir="ltr">${totalPrice}</td>
           <td dir="ltr" style="font-weight: bold; color: ${orderProfit >= 0 ? '#059669' : '#dc2626'};">${orderProfit > 0 ? '+' : ''}${orderProfit}</td>
         </tr>
       `;
@@ -81,7 +100,7 @@ export default function AccountingArchiveTab({ archivedOrders, refreshData }) {
           .invoice-details h2 span { color: #4f46e5; }
           .invoice-details p { margin: 0; color: #6b7280; font-weight: bold; }
           table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-          th, td { border: 1px solid #d1d5db; padding: 12px; text-align: right; }
+          th, td { border: 1px solid #d1d5db; padding: 12px; text-align: right; vertical-align: top; }
           th { background-color: #f3f4f6; color: #374151; font-weight: bold; font-size: 14px; }
           td { font-size: 14px; }
           .summary-container { display: flex; justify-content: flex-end; }
@@ -111,8 +130,9 @@ export default function AccountingArchiveTab({ archivedOrders, refreshData }) {
             <tr>
               <th>ت</th>
               <th>رقم الوصل</th>
-              <th>العميل</th>
+              <th>العميل والتفاصيل</th>
               <th>سعر التكلفة</th>
+              <th>الحافز المكتسب</th>
               <th>أجور التوصيل</th>
               <th>المبلغ المُحصل (البيع)</th>
               <th>صافي الربح</th>
@@ -131,14 +151,18 @@ export default function AccountingArchiveTab({ archivedOrders, refreshData }) {
             </div>
             <div class="summary-row">
               <span>إجمالي التكلفة (رأس المال):</span>
-              <span dir="ltr">${invoice.totalOriginalCost}</span>
+              <span dir="ltr" style="color: #dc2626;">- ${invoice.totalOriginalCost}</span>
             </div>
             <div class="summary-row">
               <span>إجمالي أجور التوصيل:</span>
-              <span dir="ltr">${invoice.totalDeliveryCost}</span>
+              <span dir="ltr" style="color: #dc2626;">- ${invoice.totalDeliveryCost}</span>
+            </div>
+            <div class="summary-row">
+              <span>إجمالي الحوافز (تضاف للربح):</span>
+              <span dir="ltr" style="color: #059669; font-weight: bold;">+ ${invoice.totalIncentive}</span>
             </div>
             <div class="summary-row total">
-              <span>صافي الأرباح:</span>
+              <span>صافي الأرباح النهائي:</span>
               <span dir="ltr">${invoice.netProfit > 0 ? '+' : ''}${invoice.netProfit}</span>
             </div>
           </div>
@@ -167,11 +191,18 @@ export default function AccountingArchiveTab({ archivedOrders, refreshData }) {
       const incentive = parseFloat(order.incentive) || 0;
       const shopRequired = originalCost - incentive;
       
+      const carInfo = order.car_brand ? `🚗 السيارة: ${order.car_brand} - ${order.car_model || ''} (${order.car_year || ''})` : '';
+      const productsInfo = order.product_type ? `📦 المنتجات: ${order.product_type}` : '';
+
       return `
         <tr>
           <td>${index + 1}</td>
           <td dir="ltr" style="font-family: monospace;">${order.tracking_number || '-'}</td>
-          <td>${order.customer_name} ${order.order_type === 'replacement' ? '(استبدال)' : ''}</td>
+          <td>
+            <div style="font-weight: bold; font-size: 14px;">${order.customer_name} ${order.order_type === 'replacement' ? '(استبدال)' : ''}</div>
+            ${productsInfo ? `<div style="font-size: 11px; color: #4b5563; margin-top: 4px; white-space: pre-wrap;">${productsInfo}</div>` : ''}
+            ${carInfo ? `<div style="font-size: 11px; color: #7e22ce; margin-top: 2px; font-weight: bold;">${carInfo}</div>` : ''}
+          </td>
           <td dir="ltr">${originalCost}</td>
           <td dir="ltr">${incentive}</td>
           <td dir="ltr" style="font-weight: bold; color: #7e22ce;">${shopRequired}</td>
@@ -194,7 +225,7 @@ export default function AccountingArchiveTab({ archivedOrders, refreshData }) {
           .invoice-details h2 span { color: #7e22ce; }
           .invoice-details p { margin: 0; color: #6b7280; font-weight: bold; }
           table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-          th, td { border: 1px solid #d1d5db; padding: 12px; text-align: right; }
+          th, td { border: 1px solid #d1d5db; padding: 12px; text-align: right; vertical-align: top; }
           th { background-color: #f3f4f6; color: #374151; font-weight: bold; font-size: 14px; }
           td { font-size: 14px; }
           .summary-container { display: flex; justify-content: flex-end; }
@@ -224,7 +255,7 @@ export default function AccountingArchiveTab({ archivedOrders, refreshData }) {
             <tr>
               <th>ت</th>
               <th>رقم الوصل</th>
-              <th>العميل</th>
+              <th>العميل والتفاصيل</th>
               <th>سعر التكلفة (رأس المال)</th>
               <th>مبلغ الحافز (يُخصم)</th>
               <th>المطلوب للمحل</th>
@@ -294,7 +325,6 @@ export default function AccountingArchiveTab({ archivedOrders, refreshData }) {
           
           <div className="absolute top-4 left-4 flex gap-2 z-10">
               
-              {/* 🖨️ زر طباعة فاتورة المحل (بنفسجي مع أيقونة Banknote الآمنة) */}
               <button 
                 onClick={() => handlePrintShopInvoice(invoice)}
                 className="bg-purple-500/20 hover:bg-purple-600 text-purple-400 hover:text-white p-2.5 rounded-xl transition-all shadow-lg border border-purple-500/30"
@@ -303,7 +333,6 @@ export default function AccountingArchiveTab({ archivedOrders, refreshData }) {
                 <Banknote className="w-5 h-5" />
               </button>
 
-              {/* 🖨️ زر طباعة الفاتورة العامة (أزرق) */}
               <button 
                 onClick={() => handlePrintInvoice(invoice)}
                 className="bg-sky-500/20 hover:bg-sky-600 text-sky-400 hover:text-white p-2.5 rounded-xl transition-all shadow-lg border border-sky-500/30"
@@ -365,7 +394,7 @@ export default function AccountingArchiveTab({ archivedOrders, refreshData }) {
               <thead className="text-xs text-indigo-300 uppercase border-b border-indigo-500/20">
                 <tr>
                   <th className="px-4 py-3 font-bold">رقم الوصل</th>
-                  <th className="px-4 py-3 font-bold">العميل</th>
+                  <th className="px-4 py-3 font-bold">العميل والتفاصيل</th>
                   <th className="px-4 py-3 font-bold text-center">التكلفة</th>
                   <th className="px-4 py-3 font-bold text-center">الحافز</th>
                   <th className="px-4 py-3 font-bold text-center">للمحل</th>
@@ -377,12 +406,16 @@ export default function AccountingArchiveTab({ archivedOrders, refreshData }) {
                    const originalCost = parseFloat(order.original_price) || 0;
                    const incentive = parseFloat(order.incentive) || 0;
                    const shopReq = originalCost - incentive;
-                   const orderProfit = (parseFloat(order.total_price) || 0) - (originalCost + (parseFloat(order.delivery_cost) || 0));
+                   const orderProfit = (parseFloat(order.total_price) || 0) - shopReq - (parseFloat(order.delivery_cost) || 0);
                    
                    return (
                      <tr key={order.id} className="border-b border-white/5 hover:bg-white/5">
                         <td className="px-4 py-3 font-mono text-white" dir="ltr">{order.tracking_number || '-'}</td>
-                        <td className="px-4 py-3 font-bold text-indigo-200">{order.customer_name}</td>
+                        <td className="px-4 py-3 font-bold text-indigo-200">
+                           <div>{order.customer_name}</div>
+                           {order.product_type && <div className="text-xs text-gray-400 font-normal mt-1">📦 ${order.product_type.replace(/\n/g, ' | ')}</div>}
+                           {order.car_brand && <div className="text-xs text-amber-300/80 font-normal mt-0.5">🚗 ${order.car_brand} - ${order.car_model || ''}</div>}
+                        </td>
                         <td className="px-4 py-3 text-center">{originalCost}</td>
                         <td className="px-4 py-3 text-center">{incentive}</td>
                         <td className="px-4 py-3 text-center font-bold text-purple-400">{shopReq}</td>

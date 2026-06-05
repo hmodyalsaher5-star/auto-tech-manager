@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabase';
-import { Truck, MapPin, BookOpen, XCircle, Library } from 'lucide-react';
+import { Truck, MapPin, BookOpen, XCircle, Library, UserCheck } from 'lucide-react';
 import ShippedOrdersTab from '../Orders/ShippedOrdersTab';
 import DeliveredOrdersTab from '../Orders/DeliveredOrdersTab';
 import ReturnedOrdersTab from '../Orders/ReturnedOrdersTab';
 import AccountingArchiveTab from '../Orders/AccountingArchiveTab';
+import SalesBalancesTab from '../Orders/SalesBalancesTab'; // 🆕 استيراد صفحة الأرصدة المستقلة الجديدة
 
 export default function DeliverySettlement() {
   const [activeTab, setActiveTab] = useState('shipped'); 
@@ -13,6 +14,7 @@ export default function DeliverySettlement() {
   const [deliveredOrders, setDeliveredOrders] = useState([]);
   const [returnedOrders, setReturnedOrders] = useState([]); 
   const [archivedOrders, setArchivedOrders] = useState([]); 
+  const [employees, setEmployees] = useState([]); 
   const [loading, setLoading] = useState(true);
 
   const [financialInputs, setFinancialInputs] = useState({});
@@ -33,24 +35,28 @@ export default function DeliverySettlement() {
       setDeliveredOrders(delivered);
       const initialInputs = {};
       delivered.forEach(order => {
-        // 🆕 تم إضافة سعر البيع (totalPrice) لكي يتعرف عليه النظام عند التحميل
         initialInputs[order.id] = { 
           originalPrice: order.original_price || '', 
           deliveryCost: order.delivery_cost || '',
           incentive: order.incentive || '',
-          totalPrice: order.total_price || '' // 👈 التعديل هنا
+          totalPrice: order.total_price || '',
+          employeeCommission: order.employee_commission || '' 
         };
       });
       setFinancialInputs(initialInputs);
     }
 
-    // 3. الرواجع
+    // 3. ⁠الرواجع
     const { data: returned } = await supabase.from('orders').select('*').in('status', ['returned', 'replaced']).order('created_at', { ascending: false });
     setReturnedOrders(returned || []);
 
     // 4. الأرشيف
     const { data: archived } = await supabase.from('orders').select('*').eq('status', 'settled_archived').order('created_at', { ascending: false });
     setArchivedOrders(archived || []);
+
+    // 5. جلب بيانات أرصدة الموظفين الحالية من السيرفر
+    const { data: emps } = await supabase.from('employees').select('*').order('name', { ascending: true });
+    setEmployees(emps || []);
 
     setLoading(false);
   };
@@ -86,9 +92,6 @@ export default function DeliverySettlement() {
     setFinancialInputs(prev => ({ ...prev, [orderId]: { ...prev[orderId], [field]: value } })); 
   };
 
-  // ==========================================
-  // 🆕 دالة الحفظ الفردي المحدثة لتدعم سعر البيع
-  // ==========================================
   const saveFinancials = async (orderId) => {
     const inputs = financialInputs[orderId] || {};
     const order = deliveredOrders.find(o => o.id === orderId);
@@ -96,16 +99,16 @@ export default function DeliverySettlement() {
     const finalOriginalPrice = inputs.originalPrice !== undefined && inputs.originalPrice !== "" ? inputs.originalPrice : (order.original_price || order.cost_price || 0);
     const finalDeliveryCost = inputs.deliveryCost !== undefined && inputs.deliveryCost !== "" ? inputs.deliveryCost : (order.delivery_cost || 0);
     const finalIncentive = inputs.incentive !== undefined && inputs.incentive !== "" ? inputs.incentive : (order.incentive || 0);
-    
-    // 🆕 سحب سعر البيع المعدل
     const finalTotalPrice = inputs.totalPrice !== undefined && inputs.totalPrice !== "" ? inputs.totalPrice : (order.total_price || 0);
+    const finalEmpCommission = inputs.employeeCommission !== undefined && inputs.employeeCommission !== "" ? inputs.employeeCommission : (order.employee_commission || 0);
 
     const { error } = await supabase.from('orders')
       .update({ 
         original_price: finalOriginalPrice, 
         delivery_cost: finalDeliveryCost,
         incentive: finalIncentive,
-        total_price: finalTotalPrice // 👈 إرسال سعر البيع الجديد لقاعدة البيانات
+        total_price: finalTotalPrice,
+        employee_commission: finalEmpCommission 
       }).eq('id', orderId);
 
     if (!error) alert("تم حفظ الحسابات بنجاح!"); 
@@ -114,15 +117,12 @@ export default function DeliverySettlement() {
 
   const toggleRow = (orderId) => { setExpandedRows(prev => prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, orderId]); };
 
-  // ==========================================
-  // 🆕 دالة إنشاء الفاتورة المحدثة لتدعم حفظ سعر البيع
-  // ==========================================
   const handleCreateSettlement = async () => {
     if (selectedForSettlement.length === 0) return alert("يرجى تحديد طلب واحد على الأقل للتحاسب!");
-    
     if (!window.confirm(`هل أنت متأكد من إنشاء فاتورة تحاسب لعدد (${selectedForSettlement.length}) طلبات ونقلها للأرشيف؟`)) return;
 
     const invoiceRef = `INV-${Math.floor(100000 + Math.random() * 900000)}`;
+    const employeeCommissionsToUpdate = {};
 
     const promises = selectedForSettlement.map(orderId => {
       const inputs = financialInputs[orderId] || {};
@@ -131,9 +131,13 @@ export default function DeliverySettlement() {
       const finalOriginal = inputs.originalPrice !== undefined && inputs.originalPrice !== "" ? inputs.originalPrice : (order.original_price || order.cost_price || 0);
       const finalDelivery = inputs.deliveryCost !== undefined && inputs.deliveryCost !== "" ? inputs.deliveryCost : (order.delivery_cost || 0);
       const finalIncentive = inputs.incentive !== undefined && inputs.incentive !== "" ? inputs.incentive : (order.incentive || 0);
-      
-      // 🆕 سحب سعر البيع المعدل
       const finalTotalPrice = inputs.totalPrice !== undefined && inputs.totalPrice !== "" ? inputs.totalPrice : (order.total_price || 0);
+      const finalEmpCommission = inputs.employeeCommission !== undefined && inputs.employeeCommission !== "" ? inputs.employeeCommission : (order.employee_commission || 0);
+
+      if (order.sales_employee_id && parseFloat(finalEmpCommission) > 0) {
+        employeeCommissionsToUpdate[order.sales_employee_id] = 
+          (employeeCommissionsToUpdate[order.sales_employee_id] || 0) + parseFloat(finalEmpCommission);
+      }
 
       return supabase.from('orders').update({
         status: 'settled_archived',
@@ -141,7 +145,8 @@ export default function DeliverySettlement() {
         original_price: finalOriginal,
         delivery_cost: finalDelivery,
         incentive: finalIncentive,
-        total_price: finalTotalPrice // 👈 حفظ سعر البيع الجديد في السيرفر مع الفاتورة
+        total_price: finalTotalPrice,
+        employee_commission: finalEmpCommission
       }).eq('id', orderId);
     });
 
@@ -150,7 +155,18 @@ export default function DeliverySettlement() {
       const hasError = results.some(res => res.error);
       
       if (!hasError) {
-        alert(`تم التحاسب بنجاح! رقم الفاتورة: ${invoiceRef} 🧾`);
+        const empUpdatePromises = Object.entries(employeeCommissionsToUpdate).map(async ([empId, commissionSum]) => {
+          const { data: empData } = await supabase.from('employees').select('total_balance').eq('id', empId).single();
+          const currentBalance = empData ? parseFloat(empData.total_balance) || 0 : 0;
+          
+          return supabase.from('employees')
+            .update({ total_balance: currentBalance + commissionSum })
+            .eq('id', empId);
+        });
+
+        await Promise.all(empUpdatePromises);
+
+        alert(`تم التحاسب بنجاح! رقم الفاتورة: ${invoiceRef} 🧾 وتحديث أرصدة الموظفين التراكمية!`);
         setSelectedForSettlement([]);
         fetchAllData(); 
       } else {
@@ -158,6 +174,25 @@ export default function DeliverySettlement() {
       }
     } catch (err) {
       alert("حدث خطأ غير متوقع: " + err.message);
+    }
+  };
+
+  const handleClearEmployeeBalance = async (empId, empName, currentBalance) => {
+    if (currentBalance <= 0) return alert(`رصيد الموظف (${empName}) هو صفر بالفعل!`);
+    
+    const isConfirmed = window.confirm(`⚠️ كشف تسليم مالي ⚠️\nهل تؤكد أنك قمت بتسليم الموظف (${empName}) كامل مستحقاته البالغة (${currentBalance.toLocaleString()} د.ع) نقداً وتريد تصفير رصيده الآن؟`);
+    if (!isConfirmed) return;
+
+    const { error } = await supabase
+      .from('employees')
+      .update({ total_balance: 0 })
+      .eq('id', empId);
+
+    if (!error) {
+      alert(`تم تصفير حساب الموظف (${empName}) وتسجيل عملية الدفع بنجاح! 💸`);
+      fetchAllData();
+    } else {
+      alert("خطأ أثناء تصفير الحساب: " + error.message);
     }
   };
 
@@ -189,7 +224,10 @@ export default function DeliverySettlement() {
           <XCircle className="w-4 h-4" /> سجل الرواجع ({returnedOrders.length})
         </button>
         <button onClick={() => setActiveTab('archive')} className={`px-5 py-2.5 rounded-xl font-bold transition-all flex items-center gap-2 ${activeTab === 'archive' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}>
-          <Library className="w-4 h-4" /> أرشيف الحسابات
+          <Library className="w-4 h-4" /> أرشيف الحسابات ({archivedOrders.length})
+        </button>
+        <button onClick={() => setActiveTab('balances')} className={`px-5 py-2.5 rounded-xl font-bold transition-all flex items-center gap-2 ${activeTab === 'balances' ? 'bg-amber-600 text-white' : 'text-gray-400 hover:text-amber-400'}`}>
+          <UserCheck className="w-4 h-4" /> أرشيف الأرصدة ({employees.length})
         </button>
       </div>
 
@@ -209,6 +247,17 @@ export default function DeliverySettlement() {
       )}
 
       {activeTab === 'archive' && <AccountingArchiveTab archivedOrders={archivedOrders} refreshData={fetchAllData} />}
+
+      {/* 🆕 استدعاء الملف المنفصل وتمرير البيانات بمزاج وعزل تام */}
+    {/* في ملف DeliverySettlement.jsx */}
+{activeTab === 'balances' && (
+  <SalesBalancesTab 
+    employees={employees} 
+    handleClearEmployeeBalance={handleClearEmployeeBalance} 
+    refreshData={fetchAllData}
+    archivedOrders={archivedOrders} // 🆕 تمرير بيانات الأرشيف
+  />
+)}
     </div>
   );
 }

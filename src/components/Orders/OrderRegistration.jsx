@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; 
 import CustomerInfo from './CustomerInfo';
 import CarInfo from './CarInfo';
 import OrderProducts from './OrderProducts'; 
-import { PackageOpen, Banknote, RefreshCw, PackagePlus, FileText, UserCheck, ShieldAlert } from 'lucide-react'; 
+import { PackageOpen, Banknote, RefreshCw, PackagePlus, FileText, UserCheck } from 'lucide-react'; 
 import { supabase } from '../../supabase';
 
 export default function OrderRegistration({ sizes }) {
-  
+  const [employees, setEmployees] = useState([]);
+
   const [formData, setFormData] = useState({
     orderType: 'original', 
     originalTrackingNumber: '', 
@@ -27,10 +28,49 @@ export default function OrderRegistration({ sizes }) {
     
     manualDetails: '', 
     totalPrice: '', 
-    costPrice: '', // 🆕 إضافة حقل سعر التكلفة في الذاكرة
-    salesEmployee: '', // 🆕 إضافة حقل موظف المبيعات في الذاكرة
-    currency: 'IQD' // 🆕 التعديل الأول: جعل العملة الافتراضية هي الدينار العراقي
+    costPrice: '', 
+    salesEmployeeId: '', 
+    salesEmployee: '', 
+    employeeCommission: '', 
+    currency: 'IQD' 
   });
+
+  useEffect(() => {
+    const loadEmployeesAndCurrentUser = async () => {
+      const { data: emps, error } = await supabase
+        .from('employees')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (!error && emps) {
+        setEmployees(emps);
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user && user.email) {
+          const matchedEmp = emps.find(e => e.email?.toLowerCase() === user.email.toLowerCase());
+          if (matchedEmp) {
+            setFormData(prev => ({
+              ...prev,
+              salesEmployeeId: matchedEmp.id,
+              salesEmployee: matchedEmp.name 
+            }));
+          }
+        }
+      }
+    };
+
+    loadEmployeesAndCurrentUser();
+  }, []);
+
+  const handleEmployeeChange = (e) => {
+    const empId = e.target.value;
+    const selectedEmp = employees.find(emp => emp.id === empId);
+    setFormData({
+      ...formData,
+      salesEmployeeId: empId,
+      salesEmployee: selectedEmp ? selectedEmp.name : ''
+    });
+  };
 
   const needsCarInfo = formData.products.some(p => p.category === 'screen');
 
@@ -77,8 +117,12 @@ export default function OrderRegistration({ sizes }) {
           
           manual_details: formData.manualDetails || null, 
           total_price: formData.totalPrice || 0, 
-          cost_price: formData.costPrice || 0, // 🆕 التعديل الثالث: إرسال سعر التكلفة إلى عمود cost_price
-          sales_employee: formData.salesEmployee, // 🆕 التعديل الثاني: إرسال اسم الموظف إلى عمود sales_employee
+          cost_price: formData.costPrice || 0, 
+          
+          sales_employee_id: formData.salesEmployeeId || null, 
+          employee_commission: parseFloat(formData.employeeCommission) || 0, 
+          sales_employee: formData.salesEmployee, 
+          
           currency: formData.currency, 
           user_email: user?.email || 'unknown',
           status: 'pending' 
@@ -104,7 +148,6 @@ export default function OrderRegistration({ sizes }) {
 
       <form onSubmit={handleSubmit} className="max-w-5xl mx-auto">
           
-          {/* 1. قسم تحديد نوع الطلب */}
           <div className="bg-white/5 backdrop-blur-md p-6 rounded-[2rem] border border-white/10 mb-6 shadow-lg relative z-10">
               <label className="text-sm text-teal-300 mb-4 block font-bold flex items-center gap-2">
                   <PackageOpen className="w-5 h-5" /> ما هو نوع هذه الطلبية؟
@@ -149,19 +192,23 @@ export default function OrderRegistration({ sizes }) {
               )}
           </div>
 
-          {/* 🆕 التعديل الثاني: إضافة حقل موظف المبيعات الإجباري قبل بيانات الزبون لضمان تحديد هوية كاتب الطلب */}
           <div className="bg-white/5 backdrop-blur-md p-6 rounded-[2rem] border border-white/10 mb-6 shadow-lg relative z-10">
               <label className="text-sm text-amber-400 mb-3 block font-bold flex items-center gap-2">
                   <UserCheck className="w-5 h-5 text-amber-400" /> مسؤول الفاتورة / موظف المبيعات (إجباري)
               </label>
-              <input 
-                  type="text"
-                  value={formData.salesEmployee}
-                  onChange={(e) => setFormData({...formData, salesEmployee: e.target.value})}
+              <select 
+                  value={formData.salesEmployeeId}
+                  onChange={handleEmployeeChange}
                   required
-                  placeholder="اكتب اسم موظف المبيعات الذي أنشأ هذا الطلب..."
-                  className="w-full p-4 rounded-xl bg-black/40 border border-white/10 text-white focus:border-amber-500/50 outline-none transition-all shadow-inner text-sm"
-              />
+                  className="w-full p-4 rounded-xl bg-black/40 border border-white/10 text-white focus:border-amber-500/50 outline-none transition-all shadow-inner text-sm font-bold cursor-pointer"
+              >
+                  <option value="" disabled className="text-gray-500 bg-slate-900">اختر اسم موظف المبيعات...</option>
+                  {employees.map(emp => (
+                      <option key={emp.id} value={emp.id} className="text-white bg-slate-900">
+                          {emp.name}
+                      </option>
+                  ))}
+              </select>
           </div>
 
           <CustomerInfo formData={formData} setFormData={setFormData} />
@@ -172,14 +219,12 @@ export default function OrderRegistration({ sizes }) {
 
           <OrderProducts formData={formData} setFormData={setFormData} />
 
-          {/* التعديل الثالث: إدراج وتوسيع الصندوق المالي ليشمل السعر الإجمالي وسعر التكلفة معاً بالدينار العراقي */}
-          <div className="bg-gradient-to-br from-teal-900/40 to-black/60 p-5 sm:p-6 rounded-[2rem] border border-teal-500/30 mt-6 max-w-xl mr-auto shadow-xl">
+          <div className="bg-gradient-to-br from-teal-900/40 to-black/60 p-5 sm:p-6 rounded-[2rem] border border-teal-500/30 mt-6 max-w-2xl mr-auto shadow-xl">
               <label className="text-sm text-teal-300 mb-3 font-bold flex items-center gap-2">
                   <Banknote className="w-5 h-5" /> تفاصيل التسعير والعملة والربط المالي
               </label>
               
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full">
-                  {/* قائمة اختيار العملة - القيمة الافتراضية أصبحت IQD */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 w-full">
                   <div className="flex flex-col gap-1.5">
                     <span className="text-[11px] text-gray-400 mr-1">العملة:</span>
                     <select 
@@ -192,7 +237,17 @@ export default function OrderRegistration({ sizes }) {
                     </select>
                   </div>
 
-                  {/* حقل سعر التكلفة الجديد (إجباري) */}
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[11px] text-sky-300 font-bold mr-1">حافز المبيعات للموظف:</span>
+                    <input 
+                        type="number" 
+                        value={formData.employeeCommission} 
+                        onChange={(e) => setFormData({...formData, employeeCommission: e.target.value})} 
+                        placeholder="0"
+                        className="w-full p-3.5 rounded-xl bg-black/60 border border-sky-500/40 text-sky-200 font-bold outline-none focus:border-sky-400 text-center text-sm"
+                    />
+                  </div>
+
                   <div className="flex flex-col gap-1.5">
                     <span className="text-[11px] text-orange-300 font-bold mr-1">سعر التكلفة للشركة: *</span>
                     <input 
@@ -205,7 +260,6 @@ export default function OrderRegistration({ sizes }) {
                     />
                   </div>
 
-                  {/* حقل السعر الإجمالي المطلوب من الزبون */}
                   <div className="flex flex-col gap-1.5">
                     <span className="text-[11px] text-teal-300 font-bold mr-1">السعر المطلوب من الزبون: *</span>
                     <input 
