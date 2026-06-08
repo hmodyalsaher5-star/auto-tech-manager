@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../supabase';
+import { PlusCircle, ShoppingBag } from 'lucide-react'; // استيراد أيقونات داعمة للتصميم
 
 export default function AdminReview() {
   const [salesToReview, setSalesToReview] = useState([]); 
@@ -21,6 +22,10 @@ export default function AdminReview() {
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingSaleData, setEditingSaleData] = useState(null);
+
+  // 🆕 حالة حقول نموذج البيع السريع الجديد
+  const [quickForm, setQuickForm] = useState({ car_type: '', details: '', amount: '' });
+  const [quickLoading, setQuickLoading] = useState(false);
 
   // حالة فلتر التاريخ (الافتراضي: تاريخ اليوم)
   const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
@@ -68,6 +73,35 @@ export default function AdminReview() {
         setSection1Data(incentives.filter(item => item.is_standard));
         setSection2Data(incentives.filter(item => Number(item.additional_amount) > 0));
     }
+  };
+
+  // 🆕 دالة إرسال عملية البيع السريع مباشرة كـ confirmed ليظهر فوراً بالأسفل
+  const handleQuickSaleSubmit = async (e) => {
+    e.preventDefault();
+    if (!quickForm.amount || !quickForm.car_type) return alert("الرجاء تعبئة البيانات الأساسية");
+    
+    setQuickLoading(true);
+    // تكييف توقيت إدخال الفاتورة ليتطابق مع التاريخ المحدد بالفلتر أو تاريخ اليوم
+    const finalDate = filterDate ? new Date(filterDate) : new Date();
+    finalDate.setHours(12, 0, 0, 0); 
+
+    const { error } = await supabase.from('sales_operations').insert([{
+        car_type: quickForm.car_type,
+        details: quickForm.details,
+        amount_total: Number(quickForm.amount),
+        salesperson_name: 'تسجيل سريع (مدير)',
+        status: 'confirmed', // 💡 تعديل جوهري لتنزل مراجعة فورية ومباشرة
+        created_at: finalDate.toISOString() 
+    }]);
+
+    if (error) {
+        alert("❌ حدث خطأ أثناء التسجيل السريع: " + error.message);
+    } else {
+        alert("✅ تم تسجيل البيع ونزل في القائمة أدناه للتعيين المباشر!");
+        setQuickForm({ car_type: '', details: '', amount: '' });
+        refreshData();
+    }
+    setQuickLoading(false);
   };
 
   // الفلترة الآمنة لجميع الأقسام بناءً على تاريخ "عملية البيع الأصلية"
@@ -142,6 +176,10 @@ export default function AdminReview() {
   };
 
   const removeTechFromRow = (saleId, techId) => {
+      setTempAssignments(prev => ({ ...prev, [saleId]: { ...prev[saleId], techs: prev[saleId].techs.filter(t => t.id !== techId) } }));
+  };
+
+  const removeTechFromRowOnly = (saleId, techId) => {
       setTempAssignments(prev => ({ ...prev, [saleId]: { ...prev[saleId], techs: prev[saleId].techs.filter(t => t.id !== techId) } }));
   };
 
@@ -227,9 +265,56 @@ export default function AdminReview() {
   return (
     <div className="p-4 dir-rtl text-right space-y-10 animate-fadeIn max-w-[98%] mx-auto relative z-10">
       
+      {/* 🆕 نموذج تسجيل مبيعات سريع مدمج في قمة الصفحة لسهولة إدخال النواقص */}
+      <div className="relative bg-gradient-to-br from-purple-900/20 to-black/40 backdrop-blur-xl p-6 md:p-8 rounded-[2rem] border border-purple-500/30 shadow-[0_15px_35px_rgba(0,0,0,0.3)] overflow-hidden">
+        <div className="absolute top-0 right-0 w-48 h-48 bg-purple-500/5 blur-[60px] pointer-events-none"></div>
+        
+        <h2 className="text-xl md:text-2xl font-black text-purple-400 mb-6 flex items-center gap-3 relative z-10 drop-shadow-md">
+          <ShoppingBag className="w-6 h-6 text-purple-400" /> تسجيل عملية بيع سريعة (غير مسجلة)
+        </h2>
+        
+        <form onSubmit={handleQuickSaleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end relative z-10">
+          <div>
+            <label className="text-orange-200/80 font-bold text-xs mb-1.5 block">نوع السيارة / المنتج</label>
+            <input 
+              type="text" required 
+              value={quickForm.car_type} 
+              onChange={e => setQuickForm({...quickForm, car_type: e.target.value})} 
+              className="w-full p-3 rounded-xl bg-black/50 text-orange-50 border border-white/10 focus:border-purple-500/50 outline-none text-sm transition-all shadow-inner" 
+              placeholder="مثال: سوناتا 2022" 
+            />
+          </div>
+          <div>
+            <label className="text-orange-200/80 font-bold text-xs mb-1.5 block">المبلغ (د.ع)</label>
+            <input 
+              type="number" required 
+              value={quickForm.amount} 
+              onChange={e => setQuickForm({...quickForm, amount: e.target.value})} 
+              className="w-full p-3 rounded-xl bg-black/50 text-emerald-400 border border-white/10 focus:border-purple-500/50 outline-none font-bold text-sm shadow-inner text-center" 
+              placeholder="0" 
+            />
+          </div>
+          <div>
+            <label className="text-orange-200/80 font-bold text-xs mb-1.5 block">التفاصيل / الملاحظات</label>
+            <input 
+              type="text" required 
+              value={quickForm.details} 
+              onChange={e => setQuickForm({...quickForm, details: e.target.value})} 
+              className="w-full p-3 rounded-xl bg-black/50 text-orange-50 border border-white/10 focus:border-purple-500/50 outline-none text-sm transition-all shadow-inner" 
+              placeholder="شاشة ايباد + كاميرا" 
+            />
+          </div>
+          <button 
+            type="submit" disabled={quickLoading} 
+            className="bg-purple-500/20 hover:bg-purple-500/40 border border-purple-500/50 text-purple-300 font-black py-3 px-4 rounded-xl transition-all shadow-md active:scale-95 text-sm flex items-center justify-center gap-2"
+          >
+            {quickLoading ? '⏳ جاري الحفظ...' : 'تسجيل وتحديث فوري ⚡'}
+          </button>
+        </form>
+      </div>
+
       {/* 🔴 Inbox - المبيعات الواردة */}
       <div className="relative bg-white/5 backdrop-blur-xl p-6 md:p-8 rounded-[2rem] border border-white/10 shadow-xl overflow-hidden">
-        {/* توهج داخلي */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 blur-[80px] pointer-events-none"></div>
 
         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 relative z-10">
@@ -238,7 +323,6 @@ export default function AdminReview() {
                 <p className="text-xs text-orange-200/60 mt-1 font-bold">يتم عرض المعاملات حسب التاريخ المحدد فقط</p>
             </div>
 
-            {/* شريط فلترة التاريخ */}
             <div className="flex items-center gap-3 bg-black/40 p-3 rounded-2xl border border-white/10 shadow-inner">
                 <span className="text-orange-200/80 text-sm font-bold">📅 عرض يوم:</span>
                 <input 
@@ -264,7 +348,7 @@ export default function AdminReview() {
         )}
 
         <div className="overflow-x-auto relative z-10 rounded-xl border border-white/10 bg-black/20 shadow-inner">
-            <table className="w-full text-sm text-left dir-rtl">
+            <table className="w-full text-sm text-right dir-rtl">
                 <thead className="bg-black/60 text-amber-300 border-b border-white/10 text-xs font-bold uppercase tracking-wider">
                     <tr>
                         <th className="p-4 text-center border-l border-white/5 w-12">تحديد</th>
@@ -360,7 +444,7 @@ export default function AdminReview() {
                 📋 القسم الأول: السجل الأساسي (5,000)
             </h2>
             <div className="overflow-x-auto rounded-xl border border-white/10 bg-black/20 shadow-inner">
-                <table className="w-full text-sm text-left dir-rtl">
+                <table className="w-full text-sm text-right text-gray-300">
                     <thead className="bg-black/60 text-cyan-300 border-b border-white/10 text-xs font-bold uppercase">
                         <tr>
                             <th className="p-3 text-center border-l border-white/5 w-12">ت</th>
@@ -411,7 +495,7 @@ export default function AdminReview() {
                 ⭐ القسم الثاني: حوافز إضافية واستثناءات
             </h2>
             <div className="overflow-x-auto rounded-xl border border-white/10 bg-black/20 shadow-inner">
-                <table className="w-full text-sm text-left dir-rtl">
+                <table className="w-full text-sm text-right text-gray-300">
                     <thead className="bg-black/60 text-purple-300 border-b border-white/10 text-xs font-bold uppercase">
                         <tr>
                             <th className="p-3 text-right border-l border-white/5">المنتج والسيارة</th>
@@ -489,7 +573,7 @@ export default function AdminReview() {
                     {tempAssignments[currentSaleId]?.techs.map(t => (
                         <div key={t.id} className="flex justify-between bg-black/30 border border-white/5 p-3 rounded-xl items-center shadow-inner">
                             <span className="text-orange-50 font-bold">{t.name}</span>
-                            <button onClick={() => removeTechFromRow(currentSaleId, t.id)} className="text-rose-400 hover:text-rose-300 font-bold text-sm bg-rose-500/10 px-3 py-1 rounded-lg">حذف</button>
+                            <button onClick={() => removeTechFromRowOnly(currentSaleId, t.id)} className="text-rose-400 hover:text-rose-300 font-bold text-sm bg-rose-500/10 px-3 py-1 rounded-lg">حذف</button>
                         </div>
                     ))}
                 </div>
